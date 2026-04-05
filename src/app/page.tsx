@@ -89,18 +89,28 @@ export default function Home() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      getCurrentUserData().then((data) => {
+      getCurrentUserData().then(async (data) => {
         if (data?.status === 'SUSPENDED' || data?.status === 'BLOCKED') {
           alert(`Sua conta foi ${data.status === 'SUSPENDED' ? 'suspensa' : 'bloqueada'}. Entrar em contato com o suporte.`);
           signOut();
           return;
         }
         setCurrentUserData(data);
-        setActiveScreen("app");
-        getTasks().then(setTasks);
-        getProjects().then(setProjects);
-        getRoutines().then(setRoutines);
+
+        const [t, p, r] = await Promise.all([getTasks(), getProjects(), getRoutines()]);
+        setTasks(t);
+        setProjects(p);
+        setRoutines(r);
+
         getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
+        
+        if (t.length === 0 && p.length === 0 && r.length === 0) {
+            setActiveScreen("onboarding");
+            setObStep(3);
+        } else {
+            setActiveScreen("app");
+        }
+
         // Check for checkout success/cancel in URL
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
@@ -178,6 +188,25 @@ export default function Home() {
     }, 60_000); // check every minute
     return () => clearInterval(checkMidnight);
   }, [status]);
+
+  // Scroll reveal observer
+  useEffect(() => {
+    if (activeScreen === 'landing') {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('reveal-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      
+      const elements = document.querySelectorAll('.reveal-up');
+      elements.forEach(el => observer.observe(el));
+      
+      return () => observer.disconnect();
+    }
+  }, [activeScreen]);
 
   // Sync editName when session loads
   useEffect(() => {
@@ -470,7 +499,7 @@ export default function Home() {
                 só.</div>
 
             <div className="features-grid">
-                <div className="feature-card featured">
+                <div className="feature-card featured reveal-up">
                     <div>
                         <div className="feature-icon" style={{"background":"rgba(232,80,58,0.15)"}}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8503A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="11" width="18" height="10" rx="2"></rect>
@@ -513,7 +542,7 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="feature-card">
+                <div className="feature-card reveal-up">
                     <div className="feature-icon" style={{"background":"#FEF3DE"}}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4872A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -523,7 +552,7 @@ export default function Home() {
                         matinal e lembretes de rotina.</div>
                 </div>
 
-                <div className="feature-card">
+                <div className="feature-card reveal-up">
                     <div className="feature-icon" style={{"background":"#DFF0E8"}}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3D7A5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="20" x2="18" y2="10"></line>
                             <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -534,7 +563,7 @@ export default function Home() {
                         seu desempenho.</div>
                 </div>
 
-                <div className="feature-card">
+                <div className="feature-card reveal-up">
                     <div className="feature-icon" style={{"background":"#E8E4F0"}}>
                         <Icons.FolderOpen size={24} strokeWidth={1.5} color="#7A5AA8" />
                     </div>
@@ -543,7 +572,7 @@ export default function Home() {
                         com equipes.</div>
                 </div>
 
-                <div className="feature-card">
+                <div className="feature-card reveal-up">
                     <div className="feature-icon" style={{"background":"#FEE2DD"}}>
                         <Icons.RefreshCcw size={24} strokeWidth={1.5} color="#E8503A" />
                     </div>
@@ -552,7 +581,7 @@ export default function Home() {
                         repete, não esquece.</div>
                 </div>
 
-                <div className="feature-card">
+                <div className="feature-card reveal-up">
                     <div className="feature-icon" style={{"background":"#E4EEF8"}}>
                         <Icons.Globe size={24} strokeWidth={1.5} color="#3A6EA8" />
                     </div>
@@ -568,24 +597,24 @@ export default function Home() {
             <div className="section-label">Como funciona</div>
             <div className="section-title">Em 4 passos,<br/>sua vida organizada.</div>
             <div className="steps-grid">
-                <div className="step">
+                <div className="step reveal-up">
                     <div className="step-num">01<span>→</span></div>
                     <div className="step-title">Crie sua conta</div>
                     <div className="step-desc">Login social com Google. Leva menos de 30 segundos.</div>
                 </div>
-                <div className="step">
+                <div className="step reveal-up">
                     <div className="step-num">02<span>→</span></div>
                     <div className="step-title">Monte suas rotinas</div>
                     <div className="step-desc">Arraste blocos de tempo e dê nomes para seus momentos de foco. O app aprende
                         seu ritmo.</div>
                 </div>
-                <div className="step">
+                <div className="step reveal-up">
                     <div className="step-num">03<span>→</span></div>
                     <div className="step-title">Adicione tarefas</div>
                     <div className="step-desc">Qualquer tarefa, de qualquer jeito. Com prioridade, data, projeto, tempo
                         estimado.</div>
                 </div>
-                <div className="step">
+                <div className="step reveal-up">
                     <div className="step-num">04<span>✓</span></div>
                     <div className="step-title">Execute com foco</div>
                     <div className="step-desc">O app organiza tudo automaticamente no seu dia. Você só confirma e executa.
@@ -1306,7 +1335,9 @@ export default function Home() {
                             <a style={{cursor:'pointer'}} onClick={() => openTaskModal()}>+ Adicionar Rápido</a>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))',gap:'16px'}}>
-                            {tasks.filter(t => !t.isDone && !t.projectId).map(t => (
+                            {tasks.filter(t => !t.isDone && !t.projectId).map(t => {
+                                const isOverdue = !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
+                                return (
                                 <div key={t.id} style={{background: 'var(--white)', padding: '20px', borderRadius: '16px', border: '1px solid var(--cream-dark)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden'}}>
                                     <div style={{position:'absolute',top:0,left:0,bottom:0,width:'4px',background: t.priority==='high'?'var(--coral)':t.priority==='medium'?'var(--amber)':'var(--green)'}}></div>
                                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px'}}>
@@ -1322,12 +1353,13 @@ export default function Home() {
                                     </div>
                                     <h3 style={{fontSize:'16px',margin:'0 0 12px 0',color:'var(--ink)',lineHeight:'1.4',fontWeight:'600'}}>{t.title}</h3>
                                     <div style={{fontSize:'12px',color:'var(--ink-light)',display:'flex',flexWrap:'wrap',gap:'12px',alignItems:'center'}}>
+                                        {isOverdue && <span style={{display:'flex',alignItems:'center',gap:'4px',color:'var(--coral)',fontWeight:'600'}}><Icons.AlertCircle size={12} strokeWidth={2} /> Atrasada</span>}
                                         {t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.routineName}</span>}
                                         {t.date && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> {new Date(t.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span>}
                                         {t.time && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Hourglass size={12} color="var(--ink-mid)" /> {t.time}</span>}
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                         {tasks.filter(t => !t.isDone && !t.projectId).length === 0 && (
                             <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)',background:'var(--cream)',borderRadius:'16px'}}>

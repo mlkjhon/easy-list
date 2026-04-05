@@ -29,6 +29,21 @@ export async function getCurrentUserData() {
 export async function getTasks() {
   const user = await getUser();
   if (!user) return [];
+
+  // Reset routine tasks that were completed before today started
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  
+  await prisma.task.updateMany({
+    where: {
+      userId: user.id,
+      isDone: true,
+      routineName: { not: null },
+      updatedAt: { lt: startOfToday }
+    },
+    data: { isDone: false },
+  });
+
   return prisma.task.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
