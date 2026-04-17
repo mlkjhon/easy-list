@@ -1478,7 +1478,7 @@ export default function Home() {
                                     }}>
                                         <div style={{textTransform:'uppercase',fontSize:'10px',letterSpacing:'0.5px'}}>{d}</div>
                                         <div style={{fontWeight:'700',fontSize:'20px',marginTop:'4px'}}>{dateObj.getDate()}</div>
-                                        {tasks.some(t => t.date && t.date.split('T')[0] === ds && !t.isDone) && (
+                                        {tasks.some(t => t.date && new Date(t.date).toISOString().split('T')[0] === ds && !t.isDone) && (
                                             <div style={{width:'4px',height:'4px',background:isSelected?'white':'var(--coral)',borderRadius:'50%',margin:'4px auto 0'}} />
                                         )}
                                     </div>
@@ -1489,13 +1489,13 @@ export default function Home() {
                             {tasks.filter(t=> {
                                 const filterDate = selectedWeekDate || new Date().toISOString().split('T')[0];
                                 if(!t.date) return false;
-                                return t.date.split('T')[0] === filterDate;
+                                return new Date(t.date).toISOString().split('T')[0] === filterDate;
                             }).map(renderTaskItem)}
                             
                             {tasks.filter(t=> {
                                 const filterDate = selectedWeekDate || new Date().toISOString().split('T')[0];
                                 if(!t.date) return false;
-                                return t.date.split('T')[0] === filterDate;
+                                return new Date(t.date).toISOString().split('T')[0] === filterDate;
                             }).length === 0 && (
                                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)'}}>
                                     <Icons.Calendar size={40} strokeWidth={1} style={{margin:'0 auto 12px',display:'block',color:'var(--cream-dark)'}} />
