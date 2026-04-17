@@ -34,33 +34,44 @@ export async function getCurrentUserData() {
 // TASKS
 // ========================
 export async function getTasks() {
-  const user = await getUser();
-  if (!user) return [];
+  try {
+    const user = await getUser();
+    if (!user) return [];
 
-  // Reset routine tasks that were completed before today started
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  
-  await prisma.task.updateMany({
-    where: {
-      userId: user.id,
-      isDone: true,
-      routineName: { not: null },
-      updatedAt: { lt: startOfToday }
-    },
-    data: { isDone: false },
-  });
+    // Reset routine tasks that were completed before today started
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    
+    await prisma.task.updateMany({
+      where: {
+        userId: user.id,
+        isDone: true,
+        routineName: { not: null },
+        updatedAt: { lt: startOfToday }
+      },
+      data: { isDone: false },
+    });
 
-  return prisma.task.findMany({
-    where: {
-      OR: [
-        { userId: user.id },
-        { project: { collaborators: { some: { id: user.id } } } }
-      ]
-    },
-    include: { project: true },
-    orderBy: { createdAt: "desc" },
-  });
+    return prisma.task.findMany({
+      where: {
+        OR: [
+          { userId: user.id },
+          { project: { collaborators: { some: { id: user.id } } } }
+        ]
+      },
+      include: { project: true },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Erro ao buscar tarefas (possível migração pendente):", error);
+    const user = await getUser();
+    if (!user) return [];
+    // Fallback safe: apenas tarefas próprias
+    return prisma.task.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    });
+  }
 }
 
 export async function createTask(data: {
@@ -163,18 +174,30 @@ export async function deleteTask(id: string) {
 // PROJECTS
 // ========================
 export async function getProjects() {
-  const user = await getUser();
-  if (!user) return [];
-  return prisma.project.findMany({
-    where: {
-      OR: [
-        { userId: user.id },
-        { collaborators: { some: { id: user.id } } }
-      ]
-    },
-    include: { _count: { select: { tasks: true } }, collaborators: { select: { id: true, name: true, image: true, email: true } } },
-    orderBy: { createdAt: "asc" },
-  });
+  try {
+    const user = await getUser();
+    if (!user) return [];
+    return prisma.project.findMany({
+      where: {
+        OR: [
+          { userId: user.id },
+          { collaborators: { some: { id: user.id } } }
+        ]
+      },
+      include: { _count: { select: { tasks: true } }, collaborators: { select: { id: true, name: true, image: true, email: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+  } catch (error) {
+    console.error("Erro ao buscar projetos (possível migração pendente):", error);
+    const user = await getUser();
+    if (!user) return [];
+    // Fallback safe: apenas projetos próprios sem relações novas
+    return prisma.project.findMany({
+      where: { userId: user.id },
+      include: { _count: { select: { tasks: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+  }
 }
 
 export async function createProject(data: { name: string; color: string }) {

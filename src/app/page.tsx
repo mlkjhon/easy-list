@@ -20,6 +20,11 @@ export default function Home() {
   const [obPrevTools, setObPrevTools] = useState<string[]>([]);
   const [obRoutines, setObRoutines] = useState<string[]>([]);
   const [systemAlert, setSystemAlert] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Tasks
   const [tasks, setTasks] = useState<any[]>([]);
@@ -1159,15 +1164,15 @@ export default function Home() {
                         </button>
                         <div>
                             <div className="app-greeting">
-                            {activeTab === 'Meu Dia'
-                                ? <>{(() => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; })()}, <span style={{color:'var(--coral)'}}>{session?.user?.name?.split(' ')[0] || 'Usuário'}</span>! 👋</>
+                            {(!mounted || activeTab === 'Meu Dia')
+                                ? <>{(() => { if (!mounted) return 'Carregando...'; const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; })()}, <span style={{color:'var(--coral)'}}>{session?.user?.name?.split(' ')[0] || 'Usuário'}</span>! 👋</>
                                 : activeTab === 'Meu Perfil'
                                 ? <span style={{fontWeight:700,color:'var(--ink)'}}>Meu Perfil</span>
                                 : activeTab === 'Configurações'
                                 ? <span style={{fontWeight:700,color:'var(--ink)'}}>Configurações</span>
                                 : <span style={{fontWeight:700,color:'var(--ink)'}}>{activeTab.startsWith('proj-') ? projects.find((p:any)=>p.id===activeTab.replace('proj-',''))?.name || 'Projeto' : activeTab}</span>}
                             </div>
-                            <div className="app-date">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                            <div className="app-date">{mounted ? new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}</div>
                         </div>
                     </div>
                     {/* Per-tab action button */}
