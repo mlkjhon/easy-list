@@ -52,6 +52,7 @@ model User {
   tasks         Task[]
   routines      Routine[]
   projects      Project[]
+  sharedProjects Project[] @relation("ProjectCollaborators")
 
   // Admin & Billing
   role             String    @default("USER") // USER, ADMIN
@@ -74,6 +75,7 @@ model Project {
   color       String
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collaborators User[] @relation("ProjectCollaborators")
   tasks       Task[]
   createdAt   DateTime @default(now())
 }

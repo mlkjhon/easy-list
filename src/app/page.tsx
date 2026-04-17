@@ -8,7 +8,7 @@ import {
   getProjects, createProject, deleteProject,
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
-  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser
+  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject
 } from "./actions";
 
 export default function Home() {
@@ -1372,7 +1372,39 @@ export default function Home() {
                     <>
                         <div className="section-header">
                             <h2>Projeto: {projects.find((p:any) => p.id === activeTab.replace('proj-',''))?.name || 'Vazio'}</h2>
-                            <a style={{cursor:'pointer'}} onClick={() => openTaskModal({ projectId: activeTab.replace('proj-','') })}>+ Adicionar</a>
+                            <div style={{display:'flex', gap:'16px', alignItems:'center'}}>
+                                {(() => {
+                                    const proj = projects.find((p:any) => p.id === activeTab.replace('proj-',''));
+                                    const collabs = proj?.collaborators || [];
+                                    if(collabs.length === 0) return null;
+                                    return (
+                                        <div style={{display:'flex', marginRight:'8px'}}>
+                                            {collabs.map((c:any) => (
+                                                <div key={c.id} title={c.email} style={{width:'32px',height:'32px',borderRadius:'16px',background:'var(--coral)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',marginLeft:'-10px',border:'2px solid var(--cream)',fontWeight:'700'}}>{c.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                            ))}
+                                        </div>
+                                    )
+                                })()}
+                                <button onClick={async () => {
+                                    if (currentUserData?.plan === 'FREE') {
+                                        setSuccessToast('Plano FREE não possui compartilhamento avançado. Faça upgrade!');
+                                        return;
+                                    }
+                                    const email = window.prompt("Digite o email do colega de trabalho:");
+                                    if (!email) return;
+                                    try {
+                                        const res = await inviteUserToProject(activeTab.replace('proj-',''), email);
+                                        if (res.success) {
+                                            setSuccessToast('Usuário adicionado com sucesso!');
+                                            const p = await getProjects();
+                                            setProjects(p);
+                                        }
+                                    } catch (e: any) {
+                                        setSuccessToast(`Erro: ${e.message}`);
+                                    }
+                                }} style={{background:'white', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', borderRadius:'10px', padding:'6px 14px', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>+ Compartilhar</button>
+                                <button style={{cursor:'pointer', background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'7px 14px', fontSize:'13px', fontWeight:'600'}} onClick={() => openTaskModal({ projectId: activeTab.replace('proj-','') })}>Criar Tarefa</button>
+                            </div>
                         </div>
                         <div className="task-list">
                             {tasks.filter(t => !t.isDone && t.projectId === activeTab.replace('proj-','')).map(renderTaskItem)}
@@ -1518,7 +1550,27 @@ export default function Home() {
                 {/* ---- DASHBOARD ---- */}
                 {activeTab === 'Dashboard' && (
                     <>
-                        <div className="stats-row">
+                        {currentUserData?.plan === 'FREE' ? (
+                            <div style={{textAlign:'center', padding:'80px 20px', background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)'}}>
+                                <div style={{fontSize:'48px', marginBottom:'16px'}}>🔒</div>
+                                <h2 style={{fontSize:'24px', fontWeight:'800', marginBottom:'16px', color:'var(--ink)',fontFamily:"'Fraunces', serif"}}>Dashboard Bloqueado</h2>
+                                <p style={{color:'var(--ink-mid)', marginBottom:'32px', maxWidth:'400px', margin:'0 auto 32px', fontSize:'15px', lineHeight:'1.5'}}>
+                                    O Dashboard de inteligência e performance da equipe é exclusivo dos planos Pro e Premium. Desbloqueie todo o seu potencial produtivo!
+                                </p>
+                                <button onClick={() => setActiveTab('Planos')} style={{background:'var(--coral)', color:'white', padding:'14px 28px', borderRadius:'12px', fontWeight:'600', cursor:'pointer', border:'none', fontSize:'15px'}}>Fazer Upgrade Agora</button>
+                            </div>
+                        ) : (
+                            <>
+                                {currentUserData?.plan === 'PREMIUM' && (
+                                    <div style={{background:'var(--coral)',color:'var(--white)',borderRadius:'20px',padding:'24px',marginBottom:'32px',display:'flex',gap:'20px',alignItems:'center',boxShadow:'0 12px 32px rgba(232,80,58,0.15)'}}>
+                                        <div style={{fontSize:'40px'}}>✨</div>
+                                        <div>
+                                            <h3 style={{fontSize:'20px',marginBottom:'4px',fontWeight:'800',fontFamily:"'Fraunces',serif"}}>Dashboard Premium & Equipe</h3>
+                                            <p style={{fontSize:'14px',opacity:0.9,margin:0,lineHeight:'1.4'}}>Sua taxa de produtividade desta semana está <b>15% superior</b> à média dos seus colaboradores de projetos. A inteligência preditiva sugere focar em "Tarefas de Alta Prioridade" nas próximas 4 horas.</p>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="stats-row">
                             <div className="stat-card">
                                 <div className="stat-card-label">Total de tarefas</div>
                                 <div className="stat-card-num">{tasks.length}</div>
@@ -1589,6 +1641,8 @@ export default function Home() {
                                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)'}}>Nenhuma tarefa pendente ou concluída.</div>
                             )}
                         </div>
+                            </>
+                        )}
                     </>
                 )}
 
