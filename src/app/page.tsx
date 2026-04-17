@@ -109,7 +109,7 @@ export default function Home() {
 
         getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
         
-        if (t.length === 0 && p.length === 0 && r.length === 0 && !localStorage.getItem('ob_' + data.email)) {
+        if (t.length === 0 && p.length === 0 && r.length === 0 && !localStorage.getItem('ob_' + data?.email)) {
             setActiveScreen("onboarding");
             setObStep(3);
         } else {
