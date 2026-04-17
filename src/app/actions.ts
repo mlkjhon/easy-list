@@ -52,7 +52,13 @@ export async function getTasks() {
   });
 
   return prisma.task.findMany({
-    where: { userId: user.id },
+    where: {
+      OR: [
+        { userId: user.id },
+        { project: { collaborators: { some: { id: user.id } } } }
+      ]
+    },
+    include: { project: true },
     orderBy: { createdAt: "desc" },
   });
 }

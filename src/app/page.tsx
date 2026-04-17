@@ -1138,9 +1138,9 @@ export default function Home() {
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:'13px',fontWeight:'500',color:'var(--ink)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{session?.user?.name?.split(' ')[0] || 'Usuário'}</div>
-                            <div style={{fontSize:'11px',color:'var(--ink-light)'}}>
-                                              {currentUserData?.plan === 'PREMIUM' ? 'Plano Premium 👑' : currentUserData?.plan === 'PRO' ? 'Plano Pro ✨' : 'Plano Gratuito'}
-                                            </div>
+                            <div style={{fontSize:'10px', fontWeight:'700', color: currentUserData?.plan === 'PREMIUM' ? 'var(--coral)' : currentUserData?.plan === 'PRO' ? 'var(--amber)' : 'var(--ink-light)', background: currentUserData?.plan === 'PREMIUM' ? 'rgba(232,80,58,0.08)' : currentUserData?.plan === 'PRO' ? 'rgba(245,158,11,0.08)' : 'transparent', padding:'2px 6px', borderRadius:'6px', display:'inline-block', marginTop:'2px', textTransform:'uppercase', letterSpacing:'0.3px', border: currentUserData?.plan === 'FREE' ? 'none' : `1px solid ${currentUserData?.plan === 'PREMIUM' ? 'rgba(232,80,58,0.2)' : 'rgba(245,158,11,0.2)'}`}}>
+                                {currentUserData?.plan === 'PREMIUM' ? 'Premium ✨' : currentUserData?.plan === 'PRO' ? 'Pro ⭐' : 'Gratuito'}
+                            </div>
                         </div>
                         <Icons.ChevronUp size={14} style={{color:'var(--ink-faint)',transform: isProfileOpen ? 'rotate(180deg)' : 'none',transition:'transform 0.2s'}} />
                     </div>
@@ -1633,6 +1633,35 @@ export default function Home() {
                                 })()}
                             </div>
                         </div>
+
+                        {currentUserData?.plan === 'PREMIUM' && projects.some(p => p.collaborators?.length > 0) && (
+                            <div style={{marginTop:'32px'}}>
+                                <div className="section-header"><h2>Equipes Ativas em Projetos</h2></div>
+                                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'16px', marginBottom:'32px'}}>
+                                    {projects.filter(p => p.collaborators?.length > 0).map(p => (
+                                        <div key={p.id} style={{background:'var(--cream)', borderRadius:'16px', padding:'20px', border:'1.5px solid var(--cream-dark)'}}>
+                                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px'}}>
+                                                <div style={{fontWeight:'700', color:p.color}}>{p.name}</div>
+                                                <div style={{fontSize:'11px', background:'white', padding:'4px 8px', borderRadius:'10px', color:'var(--ink-mid)', border:'1px solid var(--cream-dark)'}}>{p.collaborators.length + 1} membros</div>
+                                            </div>
+                                            <div style={{display:'flex', gap:'6px', marginBottom:'16px'}}>
+                                                <div title="Dono" style={{width:'28px', height:'28px', borderRadius:'14px', background:'var(--white)', border:'1.5px solid var(--coral)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'700'}}>D</div>
+                                                {p.collaborators.map((c: any) => (
+                                                    <div key={c.id} title={c.name} style={{width:'28px', height:'28px', borderRadius:'14px', background:'white', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'700'}}>{c.name?.charAt(0).toUpperCase()}</div>
+                                                ))}
+                                            </div>
+                                            <div style={{fontSize:'12px', color:'var(--ink-mid)', display:'flex', justifyContent:'space-between'}}>
+                                                <span>Progresso do Time:</span>
+                                                <span style={{fontWeight:'600'}}>{tasks.filter(t => t.projectId === p.id && t.isDone).length} / {tasks.filter(t => t.projectId === p.id).length}</span>
+                                            </div>
+                                            <div style={{height:'4px', background:'rgba(0,0,0,0.05)', borderRadius:'2px', marginTop:'8px', overflow:'hidden'}}>
+                                                <div style={{height:'100%', width: tasks.filter(t => t.projectId === p.id).length > 0 ? `${(tasks.filter(t => t.projectId === p.id && t.isDone).length / tasks.filter(t => t.projectId === p.id).length) * 100}%` : '0%', background:'var(--coral)', borderRadius:'2px'}}></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="section-header"><h2>Todas as Tarefas</h2></div>
                         <div className="task-list">
