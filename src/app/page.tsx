@@ -15,6 +15,7 @@ export default function Home() {
   const [activeScreen, setActiveScreen] = useState('landing');
   const [obStep, setObStep] = useState(1);
   const [activeTab, setActiveTab] = useState('Meu Dia');
+  const [selectedWeekDate, setSelectedWeekDate] = useState<string|null>(null);
   const [obUseMode, setObUseMode] = useState<string|null>(null);
   const [obPrevTools, setObPrevTools] = useState<string[]>([]);
   const [obRoutines, setObRoutines] = useState<string[]>([]);
@@ -108,7 +109,7 @@ export default function Home() {
 
         getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
         
-        if (t.length === 0 && p.length === 0 && r.length === 0) {
+        if (t.length === 0 && p.length === 0 && r.length === 0 && !localStorage.getItem('ob_' + data.email)) {
             setActiveScreen("onboarding");
             setObStep(3);
         } else {
@@ -927,7 +928,7 @@ export default function Home() {
                     </div>
                     {obRoutines.length > 0 && <div style={{fontSize:'13px',color:'var(--coral)',fontWeight:'600',marginBottom:'12px'}}>{obRoutines.length} bloco{obRoutines.length > 1 ? 's' : ''} selecionado{obRoutines.length > 1 ? 's' : ''} ✓</div>}
                     <div style={{fontSize:'13px',color:'var(--ink-faint)',marginBottom:'16px'}}>Clique nos chips acima para selecionar seus blocos de rotina.</div>
-                    <button className="ob-btn" onClick={() => { if(obRoutines.length > 0) setActiveScreen('app'); }} style={{opacity: obRoutines.length > 0 ? 1 : 0.5, cursor: obRoutines.length > 0 ? 'pointer' : 'not-allowed'}}>Começar a usar! 🚀</button>
+                    <button className="ob-btn" onClick={() => { if(obRoutines.length > 0) { localStorage.setItem('ob_' + session?.user?.email, 'true'); setActiveScreen('app'); } }} style={{opacity: obRoutines.length > 0 ? 1 : 0.5, cursor: obRoutines.length > 0 ? 'pointer' : 'not-allowed'}}>Começar a usar! 🚀</button>
                 </div>
 
                 <div>
@@ -1109,8 +1110,8 @@ export default function Home() {
                                     {session?.user?.image ? <img src={session.user.image} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} /> : (session?.user?.name?.[0] || 'U')}
                                 </div>
                                 <div>
-                                    <div style={{fontSize:'14px',fontWeight:'600',color:'var(--ink)'}}>{session?.user?.name || 'Usuário'}</div>
-                                    <div style={{fontSize:'12px',color:'var(--ink-light)'}}>{session?.user?.email}</div>
+                                    <div style={{fontSize:'14px',fontWeight:'600',color:'var(--ink)',overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',wordBreak:'break-word'}}>{session?.user?.name || 'Usuário'}</div>
+                                    <div style={{fontSize:'12px',color:'var(--ink-light)',overflow:'hidden',textOverflow:'ellipsis'}}>{session?.user?.email}</div>
                                     <div style={{fontSize:'11px',color:'var(--coral)',marginTop:'2px',fontWeight:'500'}}>
                                         {currentUserData?.plan === 'PRO' ? 'Plano Pro ✨' : currentUserData?.plan === 'PREMIUM' ? 'Plano Premium 👑' : 'Plano Gratuito'}
                                     </div>
@@ -1184,7 +1185,7 @@ export default function Home() {
                         <button className="app-add-btn" onClick={() => openTaskModal({ priority: 'high', important: true })}><Icons.Star size={16} style={{display:'inline',marginBottom:'-3px'}}/> Tarefa importante</button>
                     )}
                     {activeTab === 'Esta Semana' && (
-                        <button className="app-add-btn" onClick={() => openTaskModal({ date: new Date().toISOString().split('T')[0] })}><Icons.Calendar size={16} style={{display:'inline',marginBottom:'-3px'}}/> Agendar tarefa</button>
+                        <button className="app-add-btn" onClick={() => openTaskModal({ date: selectedWeekDate || new Date().toISOString().split('T')[0] })}><Icons.Calendar size={16} style={{display:'inline',marginBottom:'-3px'}}/> Dia selecionado</button>
                     )}
                     {activeTab === 'Rotinas' && (
                         <button className="app-add-btn" onClick={() => {
@@ -1461,23 +1462,46 @@ export default function Home() {
                     <>
                         <div className="section-header"><h2>Tarefas desta semana</h2></div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'8px',marginBottom:'24px'}}>
-                            {['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map((d,i) => (
-                                <div key={d} style={{background: i === (new Date().getDay()||7)-1 ? 'var(--coral)' : 'var(--cream)',borderRadius:'12px',padding:'12px 8px',textAlign:'center',fontSize:'12px',color: i === (new Date().getDay()||7)-1 ? 'white' : 'var(--ink-mid)',fontWeight: i === (new Date().getDay()||7)-1 ? 600 : 400}}>
-                                    <div>{d}</div>
-                                    <div style={{fontWeight:'bold',fontSize:'16px',marginTop:'4px'}}>{new Date(new Date().setDate(new Date().getDate() - ((new Date().getDay()||7)-1) + i)).getDate()}</div>
-                                </div>
-                            ))}
+                            {['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map((d,i) => {
+                                const dateObj = new Date();
+                                dateObj.setDate(dateObj.getDate() - ((dateObj.getDay()||7)-1) + i);
+                                const ds = dateObj.toISOString().split('T')[0];
+                                const isSelected = selectedWeekDate ? ds === selectedWeekDate : i === (new Date().getDay()||7)-1;
+                                
+                                return (
+                                    <div key={d} onClick={() => setSelectedWeekDate(ds)} style={{
+                                        background: isSelected ? 'var(--coral)' : 'var(--cream)',
+                                        borderRadius:'12px',padding:'12px 0',textAlign:'center',fontSize:'12px',
+                                        color: isSelected ? 'white' : 'var(--ink-mid)',
+                                        fontWeight: isSelected ? 600 : 500, cursor: 'pointer',
+                                        border: isSelected ? 'none' : '1px solid var(--cream-dark)',
+                                    }}>
+                                        <div style={{textTransform:'uppercase',fontSize:'10px',letterSpacing:'0.5px'}}>{d}</div>
+                                        <div style={{fontWeight:'700',fontSize:'20px',marginTop:'4px'}}>{dateObj.getDate()}</div>
+                                        {tasks.some(t => t.date && t.date.split('T')[0] === ds && !t.isDone) && (
+                                            <div style={{width:'4px',height:'4px',background:isSelected?'white':'var(--coral)',borderRadius:'50%',margin:'4px auto 0'}} />
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                         <div className="task-list">
                             {tasks.filter(t=> {
-                                if(!t.date) return true; // keep unscheduled
-                                const d = new Date(t.date);
-                                const today = new Date();
-                                const first = today.getDate() - today.getDay() + 1;
-                                const firstDay = new Date(today.setDate(first));
-                                const lastDay = new Date(today.setDate(first + 6));
-                                return d >= firstDay && d <= lastDay;
+                                const filterDate = selectedWeekDate || new Date().toISOString().split('T')[0];
+                                if(!t.date) return false;
+                                return t.date.split('T')[0] === filterDate;
                             }).map(renderTaskItem)}
+                            
+                            {tasks.filter(t=> {
+                                const filterDate = selectedWeekDate || new Date().toISOString().split('T')[0];
+                                if(!t.date) return false;
+                                return t.date.split('T')[0] === filterDate;
+                            }).length === 0 && (
+                                <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)'}}>
+                                    <Icons.Calendar size={40} strokeWidth={1} style={{margin:'0 auto 12px',display:'block',color:'var(--cream-dark)'}} />
+                                    Nenhuma tarefa para este dia.
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
