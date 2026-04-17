@@ -1163,11 +1163,19 @@
       gap: 0;
       flex: 1;
       padding-top: 20px;
+      position: relative;
+      z-index: 1;
     }
 
     .ob-screen.active {
-      display: flex;
+      display: flex !important;
       animation: fadeUp 0.4s ease;
+    }
+
+    .ob-card, .ob-option, .timeline-chip {
+      position: relative;
+      z-index: 2;
+      -webkit-tap-highlight-color: rgba(232,80,58,0.1);
     }
 
     @keyframes fadeUp {
@@ -1268,42 +1276,58 @@
     }
 
     .ob-card {
-      border: 1.5px solid var(--cream-dark);
-      border-radius: 16px;
-      padding: 20px;
+      border: 2px solid var(--cream-dark);
+      border-radius: 20px;
+      padding: 24px 20px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
       background: var(--white);
       position: relative;
+      z-index: 2;
+      box-shadow: 0 2px 8px rgba(26,22,18,0.04);
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     .ob-card:hover {
       border-color: var(--coral);
-      background: rgba(232, 80, 58, 0.03);
+      background: rgba(232, 80, 58, 0.04);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(232,80,58,0.12);
+    }
+
+    .ob-card:active {
+      transform: scale(0.97);
     }
 
     .ob-card.selected {
       border-color: var(--coral);
-      background: rgba(232, 80, 58, 0.06);
+      background: rgba(232, 80, 58, 0.07);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(232,80,58,0.15);
     }
 
-    .ob-card.selected::after {
-      content: '✓';
+    .ob-card-check {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 22px;
-      height: 22px;
+      top: 12px;
+      right: 12px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
-      background: var(--coral);
-      color: white;
-      font-size: 12px;
+      background: var(--cream-dark);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      line-height: 22px;
-      text-align: center;
+      font-size: 11px;
+      color: transparent;
+      transition: all 0.2s;
+      border: 2px solid var(--cream-dark);
+    }
+
+    .ob-card.selected .ob-card-check {
+      background: var(--coral);
+      border-color: var(--coral);
+      color: white;
     }
 
     .ob-card-icon {
@@ -1330,28 +1354,60 @@
     }
 
     .ob-option {
-      border: 1.5px solid var(--cream-dark);
-      border-radius: 12px;
+      border: 2px solid var(--cream-dark);
+      border-radius: 14px;
       padding: 14px 18px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       background: var(--white);
       font-size: 14px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      min-height: 44px;
+      gap: 14px;
+      min-height: 52px;
+      position: relative;
+      z-index: 2;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow: 0 2px 6px rgba(26,22,18,0.04);
     }
 
     .ob-option:hover {
-      border-color: var(--coral);
+      border-color: rgba(232,80,58,0.5);
       background: rgba(232, 80, 58, 0.03);
+      transform: translateX(4px);
+    }
+
+    .ob-option:active {
+      transform: scale(0.98);
     }
 
     .ob-option.selected {
       border-color: var(--coral);
       color: var(--coral);
-      background: rgba(232, 80, 58, 0.06);
+      background: rgba(232, 80, 58, 0.07);
+      font-weight: 600;
+    }
+
+    .ob-option-tick {
+      margin-left: auto;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--cream-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: transparent;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .ob-option.selected .ob-option-tick {
+      background: var(--coral);
+      border-color: var(--coral);
+      color: white;
     }
 
     .ob-option-emoji {
@@ -3261,66 +3317,76 @@
         <!-- STEP 3 -->
         <div class="ob-screen" id="ob-3">
           <div class="ob-step">Passo 3 de 5</div>
-          <div class="ob-title">Como vai usar?</div>
-          <div class="ob-sub">Vamos personalizar sua experiência.</div>
+          <div class="ob-title">Como vai usar? 🤔</div>
+          <div class="ob-sub">Conta pra gente — assim personalizamos tudo pra você.</div>
           <div class="ob-cards">
             <div class="ob-card" id="card-solo" onclick="selectCard(this,'solo')">
-              <div class="ob-card-icon">👤</div>
-              <div class="ob-card-title">Para mim</div>
-              <div class="ob-card-desc">Uso pessoal, freelance ou estudos</div>
+              <div class="ob-card-check">✓</div>
+              <div class="ob-card-icon">🧑‍💻</div>
+              <div class="ob-card-title">Só eu mesmo</div>
+              <div class="ob-card-desc">Uso pessoal, estudos ou freelance</div>
             </div>
             <div class="ob-card" id="card-team" onclick="selectCard(this,'team')">
-              <div class="ob-card-icon">👥</div>
+              <div class="ob-card-check">✓</div>
+              <div class="ob-card-icon">🤝</div>
               <div class="ob-card-title">Com minha equipe</div>
-              <div class="ob-card-desc">Colaboração com outras pessoas</div>
+              <div class="ob-card-desc">Colaborar com outras pessoas</div>
             </div>
           </div>
-          <button class="ob-btn" id="ob-btn-3" disabled onclick="if(!this.disabled)nextOb(4)">Continuar →</button>
+          <button class="ob-btn" id="ob-btn-3" disabled>Continuar →</button>
         </div>
         <!-- STEP 4 -->
         <div class="ob-screen" id="ob-4">
           <div class="ob-step">Passo 4 de 5</div>
-          <div class="ob-title">Como gerencia tarefas hoje?</div>
-          <div class="ob-sub">Vamos entender seus hábitos atuais.</div>
+          <div class="ob-title">Hoje você organiza como? 📋</div>
+          <div class="ob-sub">Pode marcar mais de um — sem julgamento! 😄</div>
           <div class="ob-options">
-            <div class="ob-option" onclick="toggleOption(this,'notas')"><span
-                class="ob-option-emoji">📓</span><span>Bloco de notas físico</span></div>
-            <div class="ob-option" onclick="toggleOption(this,'outro-app')"><span
-                class="ob-option-emoji">📱</span><span>Outro app de tarefas</span></div>
-            <div class="ob-option" onclick="toggleOption(this,'agenda')"><span
-                class="ob-option-emoji">📅</span><span>Agenda/calendário</span></div>
-            <div class="ob-option" onclick="toggleOption(this,'memoria')"><span
-                class="ob-option-emoji">🧠</span><span>Tudo na memória</span></div>
-            <div class="ob-option" onclick="toggleOption(this,'planilha')"><span
-                class="ob-option-emoji">📊</span><span>Planilha ou Notion</span></div>
+            <div class="ob-option" onclick="toggleOption(this,'notas')">
+              <span class="ob-option-emoji">📓</span>
+              <span>Bloco de notas físico — old school</span>
+              <span class="ob-option-tick">✓</span>
+            </div>
+            <div class="ob-option" onclick="toggleOption(this,'outro-app')">
+              <span class="ob-option-emoji">📱</span>
+              <span>Outro app de tarefas</span>
+              <span class="ob-option-tick">✓</span>
+            </div>
+            <div class="ob-option" onclick="toggleOption(this,'agenda')">
+              <span class="ob-option-emoji">📅</span>
+              <span>Agenda ou calendário</span>
+              <span class="ob-option-tick">✓</span>
+            </div>
+            <div class="ob-option" onclick="toggleOption(this,'memoria')">
+              <span class="ob-option-emoji">🧠</span>
+              <span>Tudo na memória (corajoso!)</span>
+              <span class="ob-option-tick">✓</span>
+            </div>
+            <div class="ob-option" onclick="toggleOption(this,'planilha')">
+              <span class="ob-option-emoji">📊</span>
+              <span>Planilha ou Notion</span>
+              <span class="ob-option-tick">✓</span>
+            </div>
           </div>
           <div id="ob-4-motivational"
-            style="display:none;background:rgba(232,80,58,0.06);border-radius:12px;padding:14px;margin-bottom:16px;font-size:14px;color:var(--coral);font-weight:500">
+            style="display:none;background:rgba(232,80,58,0.06);border-radius:14px;padding:16px;margin-bottom:16px;font-size:14px;color:var(--coral);font-weight:500;border:1px solid rgba(232,80,58,0.15)">
           </div>
-          <button class="ob-btn" id="ob-btn-4" disabled onclick="if(!this.disabled)nextOb(5)">Continuar →</button>
+          <button class="ob-btn" id="ob-btn-4" disabled>Continuar →</button>
         </div>
         <!-- STEP 5 -->
         <div class="ob-screen" id="ob-5">
           <div class="ob-step">Passo 5 de 5</div>
-          <div class="ob-title">Monte sua primeira rotina.</div>
-          <div class="ob-sub">Escolha os blocos que fazem parte do seu dia.</div>
+          <div class="ob-title">Sua rotina dos sonhos 🌟</div>
+          <div class="ob-sub">Clique nos blocos que combinam com o seu dia. Você pode mudar depois!</div>
           <div class="timeline-suggestions">
-            <div class="timeline-chip" data-name="Foco Profundo" data-label="Foco profundo" onclick="toggleChip(this)">+
-              Foco profundo</div>
-            <div class="timeline-chip" data-name="Tarefas Rápidas" data-label="Tarefas rápidas"
-              onclick="toggleChip(this)">+ Tarefas rápidas</div>
-            <div class="timeline-chip" data-name="Revisão do Dia" data-label="Revisão do dia"
-              onclick="toggleChip(this)">+ Revisão do dia</div>
-            <div class="timeline-chip" data-name="Leitura" data-label="Leitura" onclick="toggleChip(this)">+ Leitura
-            </div>
-            <div class="timeline-chip" data-name="Exercício" data-label="Exercício" onclick="toggleChip(this)">+
-              Exercício</div>
-            <div class="timeline-chip" data-name="Pausa / Refeição" data-label="Pausa / Refeição"
-              onclick="toggleChip(this)">+ Pausa / Refeição</div>
+            <div class="timeline-chip" data-name="Foco Profundo" data-label="Foco profundo" onclick="toggleChip(this)">⚡ Foco profundo</div>
+            <div class="timeline-chip" data-name="Tarefas Rápidas" data-label="Tarefas rápidas" onclick="toggleChip(this)">✅ Tarefas rápidas</div>
+            <div class="timeline-chip" data-name="Revisão do Dia" data-label="Revisão do dia" onclick="toggleChip(this)">🌙 Revisão do dia</div>
+            <div class="timeline-chip" data-name="Leitura" data-label="Leitura" onclick="toggleChip(this)">📖 Leitura</div>
+            <div class="timeline-chip" data-name="Exercício" data-label="Exercício" onclick="toggleChip(this)">🏃 Exercício</div>
+            <div class="timeline-chip" data-name="Pausa / Refeição" data-label="Pausa / Refeição" onclick="toggleChip(this)">🍕 Pausa / Refeição</div>
           </div>
-          <div id="ob-chips-preview" style="min-height:40px;margin-bottom:16px"></div>
-          <button class="ob-btn" id="ob-btn-5" disabled onclick="if(!this.disabled)finishOnboarding()">Começar a usar!
-            🚀</button>
+          <div id="ob-chips-preview" style="min-height:20px;margin-bottom:20px;font-size:13px;color:var(--ink-light)"></div>
+          <button class="ob-btn" id="ob-btn-5" disabled>Criar minha conta 🚀</button>
         </div>
         <div>
           <div class="ob-progress">
@@ -3749,6 +3815,15 @@
             <div class="checkout-plan-price" id="co-plan-price">R$29,90/mês</div>
           </div>
         </div>
+        <!-- DEV MODE BANNER -->
+        <div style="background:linear-gradient(135deg,rgba(61,122,94,0.1),rgba(61,122,94,0.05));border:1.5px dashed rgba(61,122,94,0.4);border-radius:14px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">🧪</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--green)">Modo Teste / Dev</div>
+            <div style="font-size:12px;color:var(--ink-light);margin-top:2px">Ative o plano sem inserir dados de pagamento reais.</div>
+          </div>
+          <button onclick="activatePlanDev()" style="background:var(--green);color:white;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap">Ativar grátis</button>
+        </div>
         <div class="modal-field">
           <div class="modal-label">Nome completo</div><input class="modal-input" id="co-name"
             placeholder="Seu nome completo" required>
@@ -3957,12 +4032,97 @@
       showToast(`✓ Projeto "${pName.trim()}" criado com sucesso!`); 
     }
     // ONBOARDING LOGIC
-    function nextOb(screen) { for (let i = 1; i <= 5; i++) { const e = document.getElementById('ob-' + i); if (e) { e.classList.remove('active'); e.style.display = 'none'; } const r = document.getElementById('obr-' + i); if (r) r.style.display = 'none'; const d = document.getElementById('p' + i); if (d) d.classList.remove('active'); } const ce = document.getElementById('ob-' + screen); if (ce) { ce.style.display = 'flex'; ce.classList.add('active'); } const cr = document.getElementById('obr-' + screen); if (cr) cr.style.display = 'block'; const cd = document.getElementById('p' + screen); if (cd) cd.classList.add('active'); const fill = document.getElementById('ob-progress-fill'); if (fill) fill.style.width = (screen * 20) + '%'; }
-    function selectCard(el, type) { document.querySelectorAll('.ob-card').forEach(c => c.classList.remove('selected')); el.classList.add('selected'); obState.useMode = type; document.getElementById('ob-btn-3').disabled = false; }
-    function toggleOption(el, key) { el.classList.toggle('selected'); if (!obState.prevTools) obState.prevTools = []; if (el.classList.contains('selected')) { if (!obState.prevTools.includes(key)) obState.prevTools.push(key); } else { obState.prevTools = obState.prevTools.filter(k => k !== key); } const any = document.querySelectorAll('#ob-4 .ob-option.selected').length > 0; document.getElementById('ob-btn-4').disabled = !any; const mot = document.getElementById('ob-4-motivational'); if (mot) { if (obState.prevTools.includes('memoria')) { mot.style.display = 'block'; mot.textContent = 'Vamos mudar isso juntos 💪 — sugerimos ativar o lembrete matinal!'; } else mot.style.display = 'none'; } }
-    function toggleChip(el) { el.classList.toggle('selected'); const label = el.dataset.label; if (el.classList.contains('selected')) { el.textContent = '✓ ' + label; } else { el.textContent = '+ ' + label; } document.getElementById('ob-btn-5').disabled = document.querySelectorAll('.timeline-chip.selected').length === 0; }
-    function socialLogin(provider, btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="checkout-spinner" style="border-color:rgba(0,0,0,0.2);border-top-color:#333"></span> Conectando...'; btn.disabled = true; setTimeout(() => { uState = { name: 'Você', avatar: 'V', authMethod: provider.toLowerCase() }; btn.innerHTML = orig; btn.disabled = false; document.getElementById('ob-btn-2').disabled = false; nextOb(3); }, 2000); }
-    function checkNameInput() { const n = document.getElementById('ob-name').value.trim(); const e = document.getElementById('ob-email').value.trim(); const ok = n.length >= 3 && e.length >= 3; document.getElementById('ob-btn-2').disabled = !ok; if (ok) { uState.name = n; uState.avatar = n[0].toUpperCase(); } }
+    function nextOb(screen) {
+      for (let i = 1; i <= 5; i++) {
+        const e = document.getElementById('ob-' + i);
+        if (e) { e.classList.remove('active'); }
+        const r = document.getElementById('obr-' + i);
+        if (r) r.style.display = 'none';
+        const d = document.getElementById('p' + i);
+        if (d) d.classList.remove('active');
+      }
+      const ce = document.getElementById('ob-' + screen);
+      if (ce) { ce.classList.add('active'); }
+      const cr = document.getElementById('obr-' + screen);
+      if (cr) cr.style.display = 'block';
+      const cd = document.getElementById('p' + screen);
+      if (cd) cd.classList.add('active');
+      const fill = document.getElementById('ob-progress-fill');
+      if (fill) fill.style.width = (screen * 20) + '%';
+      window.scrollTo(0, 0);
+    }
+    function selectCard(el, type) {
+      // Only unselect cards in the same parent
+      el.closest('.ob-cards').querySelectorAll('.ob-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      obState.useMode = type;
+      const btn = document.getElementById('ob-btn-3');
+      if (btn) btn.disabled = false;
+    }
+    function toggleOption(el, key) {
+      el.classList.toggle('selected');
+      if (!obState.prevTools) obState.prevTools = [];
+      if (el.classList.contains('selected')) {
+        if (!obState.prevTools.includes(key)) obState.prevTools.push(key);
+      } else {
+        obState.prevTools = obState.prevTools.filter(k => k !== key);
+      }
+      const any = document.querySelectorAll('#ob-4 .ob-option.selected').length > 0;
+      const btn4 = document.getElementById('ob-btn-4');
+      if (btn4) btn4.disabled = !any;
+      const mot = document.getElementById('ob-4-motivational');
+      if (mot) {
+        if (obState.prevTools.includes('memoria')) {
+          mot.style.display = 'block';
+          mot.innerHTML = '💪 <strong>Corajoso!</strong> Vamos te dar uma estrutura incrível para organizar tudo num só lugar.';
+        } else { mot.style.display = 'none'; }
+      }
+    }
+    function toggleChip(el) {
+      el.classList.toggle('selected');
+      const label = el.dataset.label;
+      if (el.classList.contains('selected')) {
+        el.innerHTML = '✓ ' + label;
+      } else {
+        el.innerHTML = el.dataset.icon ? el.dataset.icon + ' ' + label : '+ ' + label;
+      }
+      const count = document.querySelectorAll('.timeline-chip.selected').length;
+      const btn5 = document.getElementById('ob-btn-5');
+      if (btn5) btn5.disabled = count === 0;
+      const prev = document.getElementById('ob-chips-preview');
+      if (prev) {
+        if (count > 0) {
+          prev.textContent = count + ' bloco' + (count > 1 ? 's' : '') + ' selecionado' + (count > 1 ? 's' : '') + ' ✓';
+          prev.style.color = 'var(--coral)';
+          prev.style.fontWeight = '600';
+        } else {
+          prev.textContent = 'Selecione ao menos um bloco de rotina';
+          prev.style.color = 'var(--ink-light)';
+          prev.style.fontWeight = 'normal';
+        }
+      }
+    }
+    function socialLogin(provider, btn) { const orig = btn.innerHTML; btn.innerHTML = '<span class="checkout-spinner" style="border-color:rgba(0,0,0,0.2);border-top-color:#333"></span> Conectando...'; btn.disabled = true; setTimeout(() => { uState = { name: 'Você', avatar: 'V', photoURL: null, authMethod: provider.toLowerCase() }; btn.innerHTML = orig; btn.disabled = false; document.getElementById('ob-btn-2').disabled = false; nextOb(3); }, 2000); }
+    function checkNameInput() { const n = document.getElementById('ob-name').value.trim(); const e = document.getElementById('ob-email').value.trim(); const ok = n.length >= 3 && e.length >= 3; const btn2 = document.getElementById('ob-btn-2'); if(btn2) btn2.disabled = !ok; if (ok) { uState.name = n; uState.avatar = n[0].toUpperCase(); } }
+    // WIRE UP OB BUTTONS (avoids inline onclick issues on some browsers)
+    document.addEventListener('DOMContentLoaded', function() {
+      const b1 = document.getElementById('ob-btn-1'); if(b1) b1.addEventListener('click', function() { nextOb(2); });
+      const b2 = document.getElementById('ob-btn-2'); if(b2) b2.addEventListener('click', function() { if(!this.disabled) nextOb(3); });
+      const b3 = document.getElementById('ob-btn-3'); if(b3) b3.addEventListener('click', function() { if(!this.disabled) nextOb(4); });
+      const b4 = document.getElementById('ob-btn-4'); if(b4) b4.addEventListener('click', function() { if(!this.disabled) nextOb(5); });
+      const b5 = document.getElementById('ob-btn-5'); if(b5) b5.addEventListener('click', function() { if(!this.disabled) finishOnboarding(); });
+    });
+    // DEV MODE PLAN ACTIVATION
+    function activatePlanDev() {
+      if (!checkoutPlan) return;
+      planState = checkoutPlan.plan;
+      saveAll();
+      updatePlanUI();
+      document.getElementById('co-success-title').textContent = '🎉 Plano ' + checkoutPlan.name + ' ativado (modo teste)!';
+      document.getElementById('checkout-form-view').style.display = 'none';
+      document.getElementById('checkout-success-view').style.display = 'block';
+      showToast('✓ Plano ' + checkoutPlan.name + ' ativado no modo teste!');
+    }
     // CONFETTI
     function launchConfetti() { const colors = ['#E8503A', '#F47B67', '#3D7A5E', '#D4872A', '#3A6EA8', '#7A5AA8']; for (let i = 0; i < 30; i++) { setTimeout(() => { const el = document.createElement('div'); el.className = 'confetti-piece'; el.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 30}%;background:${colors[Math.floor(Math.random() * colors.length)]};animation-duration:${0.8 + Math.random() * 0.8}s;animation-delay:${Math.random() * 0.3}s;transform:rotate(${Math.random() * 360}deg)`; document.body.appendChild(el); setTimeout(() => el.remove(), 2000); }, i * 30); } }
     // INIT
