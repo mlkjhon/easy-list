@@ -15,6 +15,10 @@ export default function Home() {
   const [activeScreen, setActiveScreen] = useState('landing');
   const [obStep, setObStep] = useState(1);
   const [activeTab, setActiveTab] = useState('Meu Dia');
+  const [obUseMode, setObUseMode] = useState<string|null>(null);
+  const [obPrevTools, setObPrevTools] = useState<string[]>([]);
+  const [obRoutines, setObRoutines] = useState<string[]>([]);
+  const [systemAlert, setSystemAlert] = useState('');
 
   // Tasks
   const [tasks, setTasks] = useState<any[]>([]);
@@ -91,8 +95,8 @@ export default function Home() {
     if (status === "authenticated") {
       getCurrentUserData().then(async (data) => {
         if (data?.status === 'SUSPENDED' || data?.status === 'BLOCKED') {
-          alert(`Sua conta foi ${data.status === 'SUSPENDED' ? 'suspensa' : 'bloqueada'}. Entrar em contato com o suporte.`);
-          signOut();
+          setSuccessToast(`⚠️ Sua conta foi ${data.status === 'SUSPENDED' ? 'suspensa' : 'bloqueada'}. Entre em contato: easylist.oficial@gmail.com`);
+          setTimeout(() => signOut(), 4000);
           return;
         }
         setCurrentUserData(data);
@@ -266,7 +270,8 @@ export default function Home() {
       setEditTaskId(null);
       refreshStats();
     } catch (err: any) {
-      alert(err.message || "Erro ao salvar tarefa.");
+      setSuccessToast('⚠️ ' + (err.message || 'Erro ao salvar tarefa. Tente novamente.'));
+      setTimeout(() => setSuccessToast(''), 4000);
     }
   };
 
@@ -444,7 +449,7 @@ export default function Home() {
                         <div className="apc-title">easy list — Meu Dia</div>
                     </div>
                     <div className="apc-body">
-                        <div className="apc-date">Hoje, 16 de Março</div>
+                        <div className="apc-date">{new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}</div>
                         <div className="apc-subtitle">3 de 7 tarefas concluídas · boa tarde!</div>
 
                         <div className="apc-block" style={{"background":"rgba(232,80,58,0.07)"}}>
@@ -745,18 +750,18 @@ export default function Home() {
             <div>
                 <div className="footer-col-title">Empresa</div>
                 <ul className="footer-links">
-                    <li><a href="#">Sobre</a></li>
-                    <li><a href="#">Blog</a></li>
-                    <li><a href="#">Carreiras</a></li>
+                    <li><a href="mailto:easylist.oficial@gmail.com">Sobre nós</a></li>
+                    <li><a href="mailto:easylist.oficial@gmail.com">Blog</a></li>
+                    <li><a href="mailto:easylist.oficial@gmail.com?subject=Vagas">Carreiras</a></li>
                     <li><a href="mailto:easylist.oficial@gmail.com">Contato</a></li>
                 </ul>
             </div>
             <div>
                 <div className="footer-col-title">Legal</div>
                 <ul className="footer-links">
-                    <li><a href="/privacidade">Privacidade</a></li>
-                    <li><a href="/termos">Termos</a></li>
-                    <li><a href="#">Cookies</a></li>
+                    <li><a href="/privacidade">Política de Privacidade</a></li>
+                    <li><a href="/termos">Termos de Uso</a></li>
+                    <li><a href="mailto:easylist.oficial@gmail.com?subject=Cookies">Cookies</a></li>
                 </ul>
             </div>
         </footer>
@@ -861,74 +866,68 @@ export default function Home() {
                 
                 <div className="ob-screen" id="ob-3" style={{ display: obStep === 3 ? 'flex' : 'none' }}>
                     <div className="ob-step">Passo 3 de 5</div>
-                    <div className="ob-title">Como você vai usar?</div>
-                    <div className="ob-sub">Vamos personalizar a sua experiência.</div>
+                    <div className="ob-title">Como você vai usar? 🤔</div>
+                    <div className="ob-sub">Conta pra gente — vamos personalizar tudo pra você.</div>
                     <div className="ob-cards">
-                        <div className="ob-card">
+                        <div className={`ob-card ${obUseMode === 'solo' ? 'selected' : ''}`} onClick={() => setObUseMode('solo')} style={{cursor:'pointer'}}>
+                            <div className="ob-card-check" style={{position:'absolute',top:'12px',right:'12px',width:'22px',height:'22px',borderRadius:'50%',background: obUseMode === 'solo' ? 'var(--coral)' : 'var(--cream-dark)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',color: obUseMode === 'solo' ? 'white' : 'transparent',transition:'all 0.2s'}}>✓</div>
                             <div className="ob-card-icon"><Icons.User size={24} strokeWidth={1.5} /></div>
-                            <div className="ob-card-title">Para mim</div>
+                            <div className="ob-card-title">Só eu mesmo</div>
                             <div className="ob-card-desc">Uso pessoal, freelance ou estudos</div>
                         </div>
-                        <div className="ob-card">
+                        <div className={`ob-card ${obUseMode === 'team' ? 'selected' : ''}`} onClick={() => setObUseMode('team')} style={{cursor:'pointer'}}>
+                            <div className="ob-card-check" style={{position:'absolute',top:'12px',right:'12px',width:'22px',height:'22px',borderRadius:'50%',background: obUseMode === 'team' ? 'var(--coral)' : 'var(--cream-dark)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',color: obUseMode === 'team' ? 'white' : 'transparent',transition:'all 0.2s'}}>✓</div>
                             <div className="ob-card-icon"><Icons.Users size={24} strokeWidth={1.5} /></div>
                             <div className="ob-card-title">Com minha equipe</div>
                             <div className="ob-card-desc">Colaboração com outras pessoas</div>
                         </div>
                     </div>
-                    <button className="ob-btn" onClick={() => setObStep(4)}>Continuar <span>→</span></button>
+                    <button className="ob-btn" onClick={() => { if(obUseMode) setObStep(4); }} style={{opacity: obUseMode ? 1 : 0.5, cursor: obUseMode ? 'pointer' : 'not-allowed'}}>Continuar <span>→</span></button>
                 </div>
 
                 
                 <div className="ob-screen" id="ob-4" style={{ display: obStep === 4 ? 'flex' : 'none' }}>
                     <div className="ob-step">Passo 4 de 5</div>
-                    <div className="ob-title">Como você gerencia tarefas hoje?</div>
-                    <div className="ob-sub">Vamos entender seus hábitos atuais.</div>
+                    <div className="ob-title">Hoje você organiza como? 📋</div>
+                    <div className="ob-sub">Pode marcar mais de um — sem julgamento! 😄</div>
                     <div className="ob-options">
-                        <div className="ob-option">
-                            <span className="ob-option-emoji"><Icons.BookOpen size={18} strokeWidth={2} /></span>
-                            <span>Bloco de notas físico</span>
-                        </div>
-                        <div className="ob-option">
-                            <span className="ob-option-emoji"><Icons.Smartphone size={18} strokeWidth={2} /></span>
-                            <span>Outro app de tarefas</span>
-                        </div>
-                        <div className="ob-option">
-                            <span className="ob-option-emoji"><Icons.Calendar size={18} strokeWidth={2} /></span>
-                            <span>Agenda/calendário</span>
-                        </div>
-                        <div className="ob-option">
-                            <span className="ob-option-emoji"><Icons.Brain size={18} strokeWidth={2} /></span>
-                            <span>Tudo na memória</span>
-                        </div>
-                        <div className="ob-option">
-                            <span className="ob-option-emoji"><Icons.BarChart2 size={18} strokeWidth={2} /></span>
-                            <span>Planilha ou Notion</span>
-                        </div>
+                        {(['notas','outro-app','agenda','memoria','planilha'] as const).map((key, i) => {
+                          const labels = ['Bloco de notas físico', 'Outro app de tarefas', 'Agenda/calendário', 'Tudo na memória (corajoso!)', 'Planilha ou Notion'];
+                          const icons = [<Icons.BookOpen key={key} size={18} strokeWidth={2} />, <Icons.Smartphone key={key} size={18} strokeWidth={2} />, <Icons.Calendar key={key} size={18} strokeWidth={2} />, <Icons.Brain key={key} size={18} strokeWidth={2} />, <Icons.BarChart2 key={key} size={18} strokeWidth={2} />];
+                          const sel = obPrevTools.includes(key);
+                          return (
+                            <div key={key} className={`ob-option ${sel ? 'selected' : ''}`} style={{cursor:'pointer',justifyContent:'space-between'}} onClick={() => setObPrevTools(prev => sel ? prev.filter(k=>k!==key) : [...prev, key])}>
+                              <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                                <span className="ob-option-emoji">{icons[i]}</span>
+                                <span>{labels[i]}</span>
+                              </div>
+                              <div style={{width:'20px',height:'20px',borderRadius:'50%',border:`2px solid ${sel ? 'var(--coral)' : 'var(--cream-dark)'}`,background: sel ? 'var(--coral)' : 'transparent',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',color:'white',flexShrink:0,transition:'all 0.2s'}}>✓</div>
+                            </div>
+                          );
+                        })}
                     </div>
-                    <button className="ob-btn" onClick={() => setObStep(5)}>Continuar <span>→</span></button>
+                    {obPrevTools.includes('memoria') && <div style={{fontSize:'13px',color:'var(--coral)',background:'rgba(232,80,58,0.06)',borderRadius:'12px',padding:'12px 16px',marginBottom:'16px',fontWeight:'500'}}>💪 <strong>Corajoso!</strong> Vamos te dar uma estrutura incrível para organizar tudo.</div>}
+                    <button className="ob-btn" onClick={() => { if(obPrevTools.length > 0) setObStep(5); }} style={{opacity: obPrevTools.length > 0 ? 1 : 0.5, cursor: obPrevTools.length > 0 ? 'pointer' : 'not-allowed'}}>Continuar <span>→</span></button>
                 </div>
 
                 
                 <div className="ob-screen" id="ob-5" style={{ display: obStep === 5 ? 'flex' : 'none' }}>
                     <div className="ob-step">Passo 5 de 5</div>
-                    <div className="ob-title">Monte sua primeira rotina.</div>
-                    <div className="ob-sub">Arraste blocos ou escolha um modelo pronto.</div>
+                    <div className="ob-title">Sua rotina dos sonhos 🌟</div>
+                    <div className="ob-sub">Clique nos blocos que fazem parte do seu dia. Você pode mudar depois!</div>
                     <div className="timeline-suggestions">
-                        <div className="timeline-chip">+
-                            Foco profundo</div>
-                        <div className="timeline-chip">+
-                            Tarefas rápidas</div>
-                        <div className="timeline-chip">+
-                            Revisão do dia</div>
-                        <div className="timeline-chip">+ Leitura
-                        </div>
+                        {(['Foco profundo','Tarefas rápidas','Revisão do dia','Leitura','Exercício','Pausa/Refeição'] as const).map(name => {
+                          const sel = obRoutines.includes(name);
+                          return (
+                            <div key={name} className={`timeline-chip ${sel ? 'selected' : ''}`} onClick={() => setObRoutines(prev => sel ? prev.filter(r=>r!==name) : [...prev, name])} style={{cursor:'pointer'}}>
+                              {sel ? `✓ ${name}` : `+ ${name}`}
+                            </div>
+                          );
+                        })}
                     </div>
-                    <div className="timeline-builder" id="timeline-builder">
-                        <div style={{"fontSize":"13px","color":"var(--ink-faint)","textAlign":"center","padding":"20px"}}>
-                            Clique nos chips acima para adicionar blocos ✦
-                        </div>
-                    </div>
-                    <button className="ob-btn" onClick={() => setActiveScreen('app')}>Começar a usar! 🚀</button>
+                    {obRoutines.length > 0 && <div style={{fontSize:'13px',color:'var(--coral)',fontWeight:'600',marginBottom:'12px'}}>{obRoutines.length} bloco{obRoutines.length > 1 ? 's' : ''} selecionado{obRoutines.length > 1 ? 's' : ''} ✓</div>}
+                    <div style={{fontSize:'13px',color:'var(--ink-faint)',marginBottom:'16px'}}>Clique nos chips acima para selecionar seus blocos de rotina.</div>
+                    <button className="ob-btn" onClick={() => { if(obRoutines.length > 0) setActiveScreen('app'); }} style={{opacity: obRoutines.length > 0 ? 1 : 0.5, cursor: obRoutines.length > 0 ? 'pointer' : 'not-allowed'}}>Começar a usar! 🚀</button>
                 </div>
 
                 <div>
@@ -1164,7 +1163,7 @@ export default function Home() {
                         <div>
                             <div className="app-greeting">
                             {activeTab === 'Meu Dia'
-                                ? <>Boa tarde, <span style={{color:'var(--coral)'}}>{session?.user?.name?.split(' ')[0] || 'Usuário'}</span>! 👋</>
+                                ? <>{(() => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; })()}, <span style={{color:'var(--coral)'}}>{session?.user?.name?.split(' ')[0] || 'Usuário'}</span>! 👋</>
                                 : activeTab === 'Meu Perfil'
                                 ? <span style={{fontWeight:700,color:'var(--ink)'}}>Meu Perfil</span>
                                 : activeTab === 'Configurações'
@@ -1190,7 +1189,8 @@ export default function Home() {
                     {activeTab === 'Rotinas' && (
                         <button className="app-add-btn" onClick={() => {
                             if (currentUserData?.plan === 'FREE' && routines.length >= 1) {
-                                alert('O Plano Gratuito permite apenas 1 rotina. Faça upgrade para o Pro para criar rotinas ilimitadas!');
+                                setSuccessToast('⚠️ Plano Gratuito: máx 1 rotina. Faça upgrade para criar rotinas ilimitadas!');
+                                setTimeout(() => setSuccessToast(''), 4000);
                                 setActiveTab('Planos');
                             } else {
                                 setIsRoutineModalOpen(true);
@@ -1753,7 +1753,10 @@ export default function Home() {
                                         const { createStripePortalSession } = await import('@/app/actions');
                                         const res = await createStripePortalSession();
                                         if (res?.url) window.location.href = res.url;
-                                        else alert('Erro ao gerar link do portal: ' + (res?.error || 'Desconhecido'));
+                                        else {
+                                            setSuccessToast('⚠️ Erro ao gerar link do portal: ' + (res?.error || 'Desconhecido'));
+                                            setTimeout(() => setSuccessToast(''), 4000);
+                                        }
                                     }} style={{background:'var(--white)', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', borderRadius:'12px', padding:'10px 20px', fontSize:'13px', fontWeight:'600', cursor:'pointer', transition:'all 0.2s'}} onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--coral)',e.currentTarget.style.color='var(--coral)')} onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--cream-dark)',e.currentTarget.style.color='var(--ink)')}>Gerenciar no Stripe</button>
                                 </div>
                             ) : (
@@ -1879,7 +1882,8 @@ export default function Home() {
                                         window.location.href = url;
                                     } else {
                                         const errText = await res.text();
-                                        alert('Erro Stripe: ' + errText);
+                                        setSuccessToast('⚠️ Erro Stripe: ' + errText);
+                                        setTimeout(() => setSuccessToast(''), 4000);
                                     }
                                 }} style={{background:'var(--cream)', color:'var(--ink)', border:'1px solid var(--cream-dark)', borderRadius:'12px', padding:'14px', fontSize:'14px', fontWeight:'600', cursor:'pointer', width:'100%', transition:'background 0.2s', textAlign:'center'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--cream-dark)')} onMouseLeave={e=>(e.currentTarget.style.background='var(--cream)')}>Assinar Plano Pro</button>
                             </div>
@@ -1908,7 +1912,8 @@ export default function Home() {
                                         window.location.href = url;
                                     } else {
                                         const errText = await res.text();
-                                        alert('Erro Stripe: ' + errText);
+                                        setSuccessToast('⚠️ Erro Stripe: ' + errText);
+                                        setTimeout(() => setSuccessToast(''), 4000);
                                     }
                                 }} style={{background:'var(--white)', color:'var(--coral)', border:'none', borderRadius:'12px', padding:'14px', fontSize:'14px', fontWeight:'600', cursor:'pointer', width:'100%', transition:'transform 0.2s', textAlign:'center'}} onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.02)')} onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}>Assinar Premium</button>
                             </div>
@@ -2014,7 +2019,8 @@ export default function Home() {
                             setNewProjectName('');
                             setIsNewProjectOpen(false);
                         } catch (err: any) {
-                            alert(err.message || "Erro ao criar projeto.");
+                            setSuccessToast('⚠️ ' + (err.message || 'Erro ao criar projeto.'));
+                            setTimeout(() => setSuccessToast(''), 4000);
                         }
                     }}>Criar projeto</button>
                 </div>
