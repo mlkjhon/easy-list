@@ -702,10 +702,8 @@ export default function Home() {
                         <li>Tarefas ilimitadas</li>
                         <li>Projetos ilimitados</li>
                         <li>Rotinas ilimitadas</li>
-                        <li>Lembretes inteligentes</li>
                         <li>Dashboard avançado</li>
-                        <li>Modo offline completo</li>
-                        <li>Compartilhamento</li>
+                        <li>Compartilhar com até 3 pessoas</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Assinar Pro</button>
                 </div>
@@ -714,12 +712,10 @@ export default function Home() {
                     <div className="pricing-price">R$59<span style={{fontSize:'24px',fontWeight:500}}>,90</span></div>
                     <div className="pricing-period">/mês (até 5 pessoas)</div>
                     <ul className="pricing-features">
-                        <li>Tudo do Pro</li>
-                        <li>5 usuários inclusos</li>
-                        <li>Projetos compartilhados</li>
-                        <li>Painel de equipe</li>
-                        <li>Sugestões com IA</li>
-                        <li>Suporte prioritário VIP</li>
+                        <li>Tudo do plano Pro</li>
+                        <li>Até 5 usuários inclusos</li>
+                        <li>Projetos compartilhados em equipe</li>
+                        <li>Dashboard mais avançado que o Pro</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Começar com o time</button>
                 </div>
