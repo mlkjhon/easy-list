@@ -9,8 +9,9 @@ import {
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
   getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject,
-  getShoppingLists, createShoppingList, deleteShoppingList, duplicateShoppingList,
-  createShoppingItem, toggleShoppingItem, deleteShoppingItem, clearBoughtShoppingItems, activatePlan
+  getShoppingLists, createShoppingList, deleteShoppingList, renameShoppingList,
+  createShoppingItem, updateShoppingItem, toggleShoppingItem, deleteShoppingItem,
+  clearPurchasedItems, duplicateShoppingList
 } from "./actions";
 
 export default function Home() {
@@ -30,25 +31,17 @@ export default function Home() {
 
   // Tasks
   const [tasks, setTasks] = useState<any[]>([]);
-  const [shoppingLists, setShoppingLists] = useState<any[]>([]);
-  const [activeShoppingListId, setActiveShoppingListId] = useState<string | null>(null);
-  const [newShoppingItemTitle, setNewShoppingItemTitle] = useState("");
-  const [newShoppingItemQty, setNewShoppingItemQty] = useState("1");
-  const [newShoppingItemUnit, setNewShoppingItemUnit] = useState("un");
-  const [newShoppingItemCategory, setNewShoppingItemCategory] = useState("Mercearia");
-  const [newShoppingItemPrice, setNewShoppingItemPrice] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDate, setNewTaskDate] = useState("");
   const [newTaskTime, setNewTaskTime] = useState("");
   const [newTaskStartTime, setNewTaskStartTime] = useState("");
-  const [newTaskDuration, setNewTaskDuration] = useState("");
-  const [newTaskReminder, setNewTaskReminder] = useState("");
+  const [newTaskEndTime, setNewTaskEndTime] = useState("");
   const [newTaskRoutine, setNewTaskRoutine] = useState("");
-  const [presetProjectId, setPresetProjectId] = useState<string | null>(null);
+  const [presetProjectId, setPresetProjectId] = useState<string|null>(null);
   const [presetImportant, setPresetImportant] = useState(false);
-  const [editTaskId, setEditTaskId] = useState<string | null>(null);
+  const [editTaskId, setEditTaskId] = useState<string|null>(null);
   
   // UI Globals
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -107,6 +100,35 @@ export default function Home() {
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
 
+  // Shopping Lists
+  const [shoppingLists, setShoppingLists] = useState<any[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string|null>(null);
+  const [isNewListModalOpen, setIsNewListModalOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQty, setNewItemQty] = useState("1");
+  const [newItemUnit, setNewItemUnit] = useState("un");
+  const [newItemCategory, setNewItemCategory] = useState("Outros");
+  const [newItemPrice, setNewItemPrice] = useState("");
+  const [editingItemId, setEditingItemId] = useState<string|null>(null);
+
+  // My Tasks filters
+  const [taskSearch, setTaskSearch] = useState("");
+  const [taskFilterStatus, setTaskFilterStatus] = useState("all");
+  const [taskFilterPriority, setTaskFilterPriority] = useState("all");
+  const [taskFilterProject, setTaskFilterProject] = useState("all");
+  const [taskFilterDate, setTaskFilterDate] = useState("all");
+  const [taskSortBy, setTaskSortBy] = useState("date");
+  const [taskViewMode, setTaskViewMode] = useState<'list'|'cards'>('list');
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkSelected, setBulkSelected] = useState<string[]>([]);
+  const [newItemQuantity, setNewItemQuantity] = useState("1");
+
+  // Pricing billing toggle
+  const [billingAnnual, setBillingAnnual] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number|null>(null);
+
   const { data: session, status } = useSession();
 
   useEffect(() => {
@@ -119,10 +141,12 @@ export default function Home() {
         }
         setCurrentUserData(data);
 
-        const [t, p, r] = await Promise.all([getTasks(), getProjects(), getRoutines()]);
+        const [t, p, r, sl] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists()]);
         setTasks(t);
         setProjects(p);
         setRoutines(r);
+        setShoppingLists(sl);
+        if (sl.length > 0) setSelectedListId(sl[0].id);
 
         getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
         
@@ -242,9 +266,6 @@ export default function Home() {
       setNewTaskPriority(opts.taskToEdit.priority);
       setNewTaskDate(opts.taskToEdit.date ? new Date(opts.taskToEdit.date).toISOString().split('T')[0] : "");
       setNewTaskTime(opts.taskToEdit.time || "");
-      setNewTaskStartTime(opts.taskToEdit.startTime || "");
-      setNewTaskDuration(opts.taskToEdit.duration || "");
-      setNewTaskReminder(opts.taskToEdit.reminderAt || "");
       setNewTaskRoutine(opts.taskToEdit.routineName || "");
       setPresetProjectId(opts.taskToEdit.projectId || null);
       setPresetImportant(opts.taskToEdit.priority === 'high');
@@ -256,9 +277,6 @@ export default function Home() {
     setNewTaskPriority(opts?.priority || "medium");
     setNewTaskDate(opts?.date || "");
     setNewTaskTime("");
-    setNewTaskStartTime("");
-    setNewTaskDuration("");
-    setNewTaskReminder("");
     setNewTaskRoutine("");
     setPresetProjectId(opts?.projectId || null);
     setPresetImportant(opts?.important || false);
@@ -270,92 +288,37 @@ export default function Home() {
 
   const handleSaveTask = async () => {
     if (!newTaskTitle.trim()) return;
-    try {
-      const taskData = {
-        title: newTaskTitle.trim(),
-        priority: newTaskPriority,
-        date: newTaskDate || null,
-        time: newTaskTime || null,
-        startTime: newTaskStartTime || null,
-        duration: newTaskDuration || null,
-        reminderAt: newTaskReminder || null,
-        projectId: presetProjectId,
-        routineName: newTaskRoutine || null
-      };
+    
+    const taskData = {
+      title: newTaskTitle,
+      priority: presetImportant ? 'high' : newTaskPriority,
+      time: newTaskTime || undefined,
+      date: newTaskDate || undefined,
+      routineName: newTaskRoutine || undefined,
+      projectId: presetProjectId || undefined,
+    };
 
+    try {
       if (editTaskId) {
-        await updateTask(editTaskId, taskData);
-        setTasks(prev => prev.map(tk => tk.id === editTaskId ? { ...tk, ...taskData } : tk));
-        setSuccessToast(lang === 'pt' ? 'Tarefa atualizada!' : lang === 'es' ? 'Tarea actualizada!' : 'Task updated!');
+        const uTask = await updateTask(editTaskId, taskData);
+        setTasks(prev => prev.map(tk => tk.id === editTaskId ? uTask : tk));
       } else {
-        const newTask = await createTask(taskData);
-        setTasks(prev => [...prev, newTask]);
-        setSuccessToast(lang === 'pt' ? 'Tarefa criada!' : lang === 'es' ? 'Tarea creada!' : 'Task created!');
+        const uTask = await createTask(taskData);
+        setTasks(prev => [uTask, ...prev]);
       }
+      
       setIsModalOpen(false);
-      setTimeout(() => setSuccessToast(''), 3000);
+      setNewTaskTitle("");
+      setEditTaskId(null);
       refreshStats();
     } catch (err: any) {
-      setSuccessToast('⚠️ ' + (err.message || 'Erro ao salvar tarefa.'));
-      setTimeout(() => setSuccessToast(''), 4000);
-      if (err.message?.includes('limite')) setActiveTab('Planos');
-    }
-  };
-
-  // --- Shopping List Handlers ---
-  const loadShoppingLists = async () => {
-    try {
-      const lists = await getShoppingLists();
-      setShoppingLists(lists);
-      if (lists.length > 0 && !activeShoppingListId) {
-        setActiveShoppingListId(lists[0].id);
-      }
-    } catch (e) { /* silent */ }
-  };
-
-  const handleCreateShoppingList = async (name: string) => {
-    try {
-      const newList = await createShoppingList(name);
-      setShoppingLists(prev => [...prev, newList]);
-      setActiveShoppingListId(newList.id);
-    } catch (err: any) {
-      setSuccessToast('⚠️ ' + (err.message || 'Erro ao criar lista.'));
+      setSuccessToast('⚠️ ' + (err.message || 'Erro ao salvar tarefa. Tente novamente.'));
       setTimeout(() => setSuccessToast(''), 4000);
     }
-  };
-
-  const handleAddShoppingItem = async () => {
-    if (!activeShoppingListId || !newShoppingItemTitle.trim()) return;
-    try {
-      const item = await createShoppingItem({
-        listId: activeShoppingListId,
-        name: newShoppingItemTitle.trim(),
-        quantity: parseFloat(newShoppingItemQty) || 1,
-        unit: newShoppingItemUnit,
-        category: newShoppingItemCategory,
-        priceEstimated: newShoppingItemPrice ? parseFloat(newShoppingItemPrice) : null
-      });
-      setShoppingLists(prev => prev.map(l => l.id === activeShoppingListId ? { ...l, items: [...(l.items || []), item] } : l));
-      setNewShoppingItemTitle("");
-      setNewShoppingItemQty("1");
-      setNewShoppingItemPrice("");
-    } catch (err: any) {
-      setSuccessToast('⚠️ ' + (err.message || 'Erro ao adicionar item.'));
-      setTimeout(() => setSuccessToast(''), 4000);
-    }
-  };
-
-  const handleToggleShoppingItem = async (itemId: string, currentStatus: boolean) => {
-    try {
-      await toggleShoppingItem(itemId, !currentStatus);
-      setShoppingLists(prev => prev.map(l => ({
-        ...l,
-        items: l.items?.map((i: any) => i.id === itemId ? { ...i, isBought: !currentStatus } : i)
-      })));
-    } catch (e) { /* silent */ }
   };
 
   const isTaskLocked = (t: any) => activeTab === 'Esta Semana' && t.date && new Date(t.date).toISOString().split('T')[0] > new Date().toISOString().split('T')[0];
+  const isTaskOverdue = (t: any) => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
 
   const getExpirationText = (t: any) => {
     if (t.isDone || !t.date) return null;
@@ -367,35 +330,6 @@ export default function Home() {
     if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira amanhã {t.time ? `às ${t.time}` : ''}</span>;
     if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira em {daysDiff} dias</span>;
     return null;
-  };
-
-  const isTaskOverdue = (t: any) => {
-    if (t.isDone || !t.date) return false;
-    const today = new Date().toISOString().split('T')[0];
-    const taskDate = new Date(t.date).toISOString().split('T')[0];
-    return taskDate < today;
-  };
-
-  const FeatureGate = ({ feature, children, fallback }: any) => {
-    const plan = currentUserData?.plan || 'FREE';
-    let isLocked = false;
-    
-    if (feature === 'Dashboard') isLocked = plan === 'FREE';
-    if (feature === 'RoutinesLimit') isLocked = plan === 'FREE' && routines.length >= 3;
-    if (feature === 'Collaboration') isLocked = plan === 'FREE';
-    
-    if (isLocked) return fallback || (
-        <div style={{textAlign:'center', padding:'60px 24px', background:'var(--white)', borderRadius:'24px', border:'1px dashed var(--coral)', boxShadow:'0 10px 30px rgba(0,0,0,0.05)'}}>
-            <div style={{fontSize:'48px', marginBottom:'16px'}}>🔒</div>
-            <h3 style={{fontSize:'20px', fontWeight:'800', marginBottom:'12px', color:'var(--ink)', fontFamily:"'Fraunces', serif"}}>Recurso Premium</h3>
-            <p style={{color:'var(--ink-mid)', marginBottom:'24px', maxWidth:'320px', margin:'0 auto 24px', fontSize:'14px', lineHeight:'1.5'}}>
-                Esta funcionalidade está disponível apenas nos planos <b>Pro</b> e <b>Premium</b>. Desbloqueie todo o seu potencial!
-            </p>
-            <button onClick={() => setActiveTab('Planos')} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'10px 24px', fontSize:'14px', fontWeight:'700', cursor:'pointer', transition:'all 0.2s'}} onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.05)')} onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}>Ver Planos</button>
-        </div>
-    );
-    
-    return children;
   };
 
   const renderTaskItem = (t: any) => {
@@ -422,11 +356,8 @@ export default function Home() {
           <div className="task-meta">
             <div className="task-project-dot" style={{background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)'}}></div>
             <span>{t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Média' : 'Baixa'}</span>
-            {t.startTime && (
-              <span style={{color:'var(--blue)', fontWeight:'600'}}>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.startTime}</span>
-            )}
-            {t.time && !t.startTime && <span>· {t.time}</span>}
-            {t.routineName && <span>· <Icons.Zap size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
+            {t.time && <span>· {t.time}</span>}
+            {t.routineName && <span>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
             {t.projectId && <span>· <Icons.Folder size={12} style={{display:'inline',marginBottom:'-2px'}}/> {projects.find((p:any)=>p.id===t.projectId)?.name || 'Projeto'}</span>}
             {locked && <span style={{color:'var(--ink-light)'}}>· 🔒 Futuro</span>}
             {overdue && <span style={{color:'var(--coral)', fontWeight:'600'}}>· ⚠️ Atrasada ({new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>}
@@ -458,6 +389,7 @@ export default function Home() {
                 onMouseLeave={e=>(e.currentTarget.style.background='transparent', e.currentTarget.style.color='var(--ink-faint)')}>
                 <Icons.Trash2 size={14} strokeWidth={1.5} />
             </button>
+            <div className="priority-bar" style={{background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)'}}></div>
         </div>
       </div>
     );
@@ -794,11 +726,12 @@ export default function Home() {
                     <div className="pricing-price">R$0</div>
                     <div className="pricing-period">para sempre</div>
                     <ul className="pricing-features">
-                        <li>Até 50 tarefas ativas</li>
-                        <li>2 projetos</li>
-                        <li>1 rotina automática</li>
-                        <li>Lembretes básicos</li>
-                        <li>Web + mobile</li>
+                        <li>✅ Tarefas ilimitadas</li>
+                        <li>✅ Projetos ilimitados</li>
+                        <li>✅ Rotinas ilimitadas</li>
+                        <li>✅ Lista de compras ilimitada</li>
+                        <li>✅ Horários nas tarefas</li>
+                        <li>✅ Web + mobile</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Começar grátis</button>
                 </div>
@@ -808,11 +741,12 @@ export default function Home() {
                     <div className="pricing-price">R$29<span style={{fontSize:'24px',fontWeight:500}}>,90</span></div>
                     <div className="pricing-period" style={{"color":"rgba(255,255,255,0.5)"}}>por mês</div>
                     <ul className="pricing-features">
-                        <li>Tarefas ilimitadas</li>
-                        <li>Projetos ilimitados</li>
-                        <li>Rotinas ilimitadas</li>
-                        <li>Dashboard avançado</li>
-                        <li>Compartilhar com até 3 pessoas</li>
+                        <li>✅ Tudo do plano Gratuito</li>
+                        <li>🚀 Dashboard avançado</li>
+                        <li>🚀 Relatórios de produtividade</li>
+                        <li>🚀 Compartilhar projetos (até 3)</li>
+                        <li>🚀 Suporte prioritário</li>
+                        <li>🤖 IA Assistente (em breve)</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Assinar Pro</button>
                 </div>
@@ -821,10 +755,12 @@ export default function Home() {
                     <div className="pricing-price">R$59<span style={{fontSize:'24px',fontWeight:500}}>,90</span></div>
                     <div className="pricing-period">/mês (até 5 pessoas)</div>
                     <ul className="pricing-features">
-                        <li>Tudo do plano Pro</li>
-                        <li>Até 5 usuários inclusos</li>
-                        <li>Projetos compartilhados em equipe</li>
-                        <li>Dashboard mais avançado que o Pro</li>
+                        <li>✅ Tudo do plano Pro</li>
+                        <li>🏢 Até 5 usuários inclusos</li>
+                        <li>🏢 Projetos compartilhados em equipe</li>
+                        <li>🏢 Dashboard executivo</li>
+                        <li>🤖 IA Assistente (acesso antecipado)</li>
+                        <li>📞 Suporte dedicado</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Começar com o time</button>
                 </div>
@@ -1161,6 +1097,16 @@ export default function Home() {
                         <Icons.Calendar size={18} className="sidebar-item-icon" />
                         {t('thisWeek', lang)}
                     </div>
+                    <div className={`sidebar-item ${activeTab === 'Minhas Tarefas' ? 'active' : ''}`} onClick={() => setActiveTab('Minhas Tarefas')}>
+                        <Icons.ListTodo size={18} className="sidebar-item-icon" />
+                        Minhas Tarefas
+                        <span className="sidebar-item-count" style={{background:'var(--ink)'}}>{tasks.length}</span>
+                    </div>
+                    <div className={`sidebar-item ${activeTab === 'Lista de Compras' ? 'active' : ''}`} onClick={() => setActiveTab('Lista de Compras')}>
+                        <Icons.ShoppingCart size={18} className="sidebar-item-icon" />
+                        Lista de Compras
+                        {shoppingLists.length > 0 && <span className="sidebar-item-count" style={{background:'var(--green)'}}>{shoppingLists.reduce((acc: number, l: any) => acc + (l.items?.filter((i: any) => !i.purchased).length ?? 0), 0)}</span>}
+                    </div>
                     <div className={`sidebar-item ${activeTab === 'Rotinas' ? 'active' : ''}`} onClick={() => setActiveTab('Rotinas')}>
                         <Icons.Clock size={18} className="sidebar-item-icon" />
                         {t('routines', lang)}
@@ -1172,10 +1118,6 @@ export default function Home() {
                     <div className={`sidebar-item ${activeTab === 'Dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('Dashboard')}>
                         <Icons.BarChart2 size={18} className="sidebar-item-icon" />
                         {t('dashboard', lang)}
-                    </div>
-                    <div className={`sidebar-item ${activeTab === 'Compras' ? 'active' : ''}`} onClick={() => { setActiveTab('Compras'); loadShoppingLists(); }}>
-                        <Icons.ShoppingCart size={18} className="sidebar-item-icon" />
-                        {lang === 'pt' ? 'Lista de Compras' : lang === 'es' ? 'Lista de Compras' : 'Shopping List'}
                     </div>
                     <div className={`sidebar-item ${activeTab === 'Planos' ? 'active' : ''}`} onClick={() => setActiveTab('Planos')}>
                         <Icons.CreditCard size={18} className="sidebar-item-icon" />
@@ -1296,17 +1238,9 @@ export default function Home() {
                     {activeTab === 'Esta Semana' && (
                         <button className="app-add-btn" onClick={() => openTaskModal({ date: selectedWeekDate || new Date().toISOString().split('T')[0] })}><Icons.Calendar size={16} style={{display:'inline',marginBottom:'-3px'}}/> Dia selecionado</button>
                     )}
-                    {activeTab === 'Rotinas' && (
-                        <button className="app-add-btn" onClick={() => {
-                            if (currentUserData?.plan === 'FREE' && routines.length >= 1) {
-                                setSuccessToast('⚠️ Plano Gratuito: máx 1 rotina. Faça upgrade para criar rotinas ilimitadas!');
-                                setTimeout(() => setSuccessToast(''), 4000);
-                                setActiveTab('Planos');
-                            } else {
-                                setIsRoutineModalOpen(true);
-                            }
-                        }}><Icons.Plus size={16} style={{display:'inline',marginBottom:'-3px'}}/> Nova rotina</button>
-                    )}
+                        <button className="app-add-btn" onClick={() => setIsRoutineModalOpen(true)}>
+                            <Icons.Plus size={16} style={{display:'inline',marginBottom:'-3px'}}/> Nova rotina
+                        </button>
                     {activeTab === 'Concluídas' && (
                         <></>
                     )}
@@ -1435,253 +1369,6 @@ export default function Home() {
                             )}
                         </div>
                     </>
-                )}
-
-                {activeTab === 'Compras' && (
-                    <div className="shopping-screen">
-                        <style jsx>{`
-                            .shopping-screen {
-                                animation: fadeIn var(--duration) var(--ease);
-                            }
-                            .shopping-grid {
-                                display: grid;
-                                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                                gap: 20px;
-                            }
-                            .shopping-list-card {
-                                background: var(--white);
-                                border-radius: 16px;
-                                border: 1.5px solid var(--cream-dark);
-                                padding: 20px;
-                                transition: all var(--duration) var(--ease);
-                                cursor: pointer;
-                            }
-                            .shopping-list-card:hover {
-                                transform: translateY(-4px);
-                                border-color: var(--coral-light);
-                                box-shadow: var(--shadow-sm);
-                            }
-                            .shopping-list-card.active {
-                                border-color: var(--coral);
-                                background: rgba(232,80,58,0.02);
-                            }
-                            .item-row {
-                                display: flex;
-                                alignItems: center;
-                                gap: 12px;
-                                padding: 8px 0;
-                                border-bottom: 1px solid var(--cream);
-                            }
-                            .item-row:last-child {
-                                border-bottom: none;
-                            }
-                            .category-badge {
-                                font-size: 10px;
-                                text-transform: uppercase;
-                                letter-spacing: 0.5px;
-                                font-weight: 700;
-                                padding: 2px 6px;
-                                borderRadius: 6px;
-                                background: var(--cream);
-                                color: var(--ink-mid);
-                            }
-                        `}</style>
-
-                        {!activeShoppingListId ? (
-                            <>
-                                <div className="section-header">
-                                    <h2>Minhas Listas de Compras</h2>
-                                    <button className="app-add-btn" onClick={() => handleCreateShoppingList(lang === 'pt' ? 'Nova Lista' : 'New List')}>
-                                        <Icons.Plus size={16} /> Nova Lista
-                                    </button>
-                                </div>
-                                <div className="shopping-grid">
-                                    {shoppingLists.length === 0 && (
-                                        <div style={{textAlign:'center', padding:'60px 20px', color:'var(--ink-faint)', gridColumn:'1/-1'}}>
-                                            <Icons.ShoppingCart size={48} strokeWidth={1} style={{margin:'0 auto 16px', display:'block'}} />
-                                            Nenhuma lista de compras ainda. Que tal criar uma agora?
-                                        </div>
-                                    )}
-                                    {shoppingLists.map((list: any) => (
-                                        <div key={list.id} className="shopping-list-card" onClick={() => setActiveShoppingListId(list.id)}>
-                                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'12px'}}>
-                                                <h3 style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', margin:0}}>{list.name}</h3>
-                                                <Icons.ChevronRight size={18} color="var(--ink-faint)" />
-                                            </div>
-                                            <div style={{fontSize:'13px', color:'var(--ink-light)', display:'flex', gap:'12px'}}>
-                                                <span>{list.items?.length || 0} itens</span>
-                                                {list.items?.filter((i:any)=>i.isBought).length > 0 && (
-                                                    <span style={{color:'var(--green)'}}>{list.items.filter((i:any)=>i.isBought).length} comprados</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="section-header">
-                                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                                        <button onClick={() => setActiveShoppingListId(null)} style={{background:'transparent', border:'none', cursor:'pointer', color:'var(--ink-mid)'}}>
-                                            <Icons.ArrowLeft size={20} />
-                                        </button>
-                                        <h2 style={{margin:0}}>{shoppingLists.find(l => l.id === activeShoppingListId)?.name}</h2>
-                                    </div>
-                                    <div style={{display:'flex', gap:'12px'}}>
-                                        <button onClick={() => {
-                                            const list = shoppingLists.find(l => l.id === activeShoppingListId);
-                                            if(list) handleCreateShoppingList(`${list.name} (Cópia)`);
-                                        }} style={{background:'var(--cream)', border:'1.5px solid var(--cream-dark)', borderRadius:'10px', padding:'6px 12px', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>Duplicar</button>
-                                        <button onClick={async () => {
-                                            if(window.confirm('Excluir esta lista?')) {
-                                                await deleteShoppingList(activeShoppingListId);
-                                                setShoppingLists(prev => prev.filter(l => l.id !== activeShoppingListId));
-                                                setActiveShoppingListId(null);
-                                            }
-                                        }} style={{background:'transparent', border:'1.5px solid #ff4d4d22', color:'#ff4d4d', borderRadius:'10px', padding:'6px 12px', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>Excluir</button>
-                                    </div>
-                                </div>
-
-                                <div style={{background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', padding:'24px', marginBottom:'24px'}}>
-                                    <div style={{display:'grid', gridTemplateColumns:'1fr auto auto auto auto auto', gap:'12px', marginBottom:'20px'}}>
-                                        <input 
-                                            type="text" 
-                                            placeholder="Nome do produto..." 
-                                            value={newItemName}
-                                            onChange={(e) => setNewItemName(e.target.value)}
-                                            style={{background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px 14px', fontSize:'14px'}}
-                                        />
-                                        <input 
-                                            type="number" 
-                                            placeholder="Qtd" 
-                                            value={newItemQty}
-                                            onChange={(e) => setNewItemQty(Number(e.target.value))}
-                                            style={{width:'60px', background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
-                                        />
-                                        <select 
-                                            value={newItemUnit}
-                                            onChange={(e) => setNewItemUnit(e.target.value)}
-                                            style={{background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
-                                        >
-                                            <option value="un">un</option>
-                                            <option value="kg">kg</option>
-                                            <option value="g">g</option>
-                                            <option value="L">L</option>
-                                            <option value="ml">ml</option>
-                                            <option value="pc">pc</option>
-                                        </select>
-                                        <select 
-                                            value={newItemCategory}
-                                            onChange={(e) => setNewItemCategory(e.target.value)}
-                                            style={{background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
-                                        >
-                                            <option value="Hortifruti">🍎 Hortifruti</option>
-                                            <option value="Mercearia">🍞 Mercearia</option>
-                                            <option value="Limpeza">🧼 Limpeza</option>
-                                            <option value="Higiene">🪥 Higiene</option>
-                                            <option value="Bebidas">🥤 Bebidas</option>
-                                            <option value="Outros">📦 Outros</option>
-                                        </select>
-                                        <input 
-                                            type="number" 
-                                            placeholder="R$" 
-                                            value={newItemPrice || ''}
-                                            onChange={(e) => setNewItemPrice(Number(e.target.value))}
-                                            style={{width:'80px', background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
-                                        />
-                                        <button 
-                                            onClick={handleAddShoppingItem}
-                                            style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'10px 20px', fontWeight:'700', cursor:'pointer'}}
-                                        >
-                                            Add
-                                        </button>
-                                    </div>
-
-                                    {/* Grouped items */}
-                                    {(() => {
-                                        const list = shoppingLists.find(l => l.id === activeShoppingListId);
-                                        if(!list || !list.items) return null;
-                                        const categories = ["Hortifruti", "Mercearia", "Limpeza", "Higiene", "Bebidas", "Outros"];
-                                        
-                                        return categories.map(cat => {
-                                            const items = list.items.filter((i: any) => i.category === cat);
-                                            if (items.length === 0) return null;
-                                            
-                                            // Sort: non-bought first, then bought
-                                            const sortedItems = [...items].sort((a,b) => (a.isBought === b.isBought) ? 0 : a.isBought ? 1 : -1);
-
-                                            return (
-                                                <div key={cat} style={{marginBottom:'24px'}}>
-                                                    <div style={{fontSize:'12px', fontWeight:'800', color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
-                                                        <span>{cat}</span>
-                                                        <div style={{flex:1, height:'1px', background:'var(--cream-dark)'}}></div>
-                                                    </div>
-                                                    {sortedItems.map((item: any) => (
-                                                        <div key={item.id} className="item-row" style={{opacity: item.isBought ? 0.6 : 1}}>
-                                                            <div 
-                                                                className="task-checkbox" 
-                                                                style={{
-                                                                    background: item.isBought ? 'var(--coral)' : 'transparent',
-                                                                    borderColor: item.isBought ? 'var(--coral)' : 'var(--cream-dark)',
-                                                                    cursor:'pointer'
-                                                                }}
-                                                                onClick={() => handleToggleShoppingItem(item.id, item.isBought)}
-                                                            >
-                                                                {item.isBought && <Icons.Check size={14} color="white" />}
-                                                            </div>
-                                                            <div style={{flex:1, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                                                <div>
-                                                                    <span style={{fontSize:'15px', color:'var(--ink)', fontWeight:'500', textDecoration: item.isBought ? 'line-through' : 'none'}}>{item.name}</span>
-                                                                    <span style={{fontSize:'12px', color:'var(--ink-light)', marginLeft:'8px'}}>{item.quantity} {item.unit}</span>
-                                                                </div>
-                                                                <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
-                                                                    {item.estimatedPrice > 0 && <span style={{fontSize:'13px', fontWeight:'600', color:'var(--green)'}}>R$ {item.estimatedPrice.toFixed(2)}</span>}
-                                                                    <button 
-                                                                        onClick={async () => {
-                                                                            await deleteShoppingItem(item.id);
-                                                                            setShoppingLists(prev => prev.map(l => ({
-                                                                                ...l,
-                                                                                items: l.items?.filter((i: any) => i.id !== item.id)
-                                                                            })));
-                                                                        }}
-                                                                        style={{background:'transparent', border:'none', color:'var(--ink-faint)', cursor:'pointer', padding:'4px'}}
-                                                                    >
-                                                                        <Icons.Trash2 size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            );
-                                        });
-                                    })()}
-
-                                    <div style={{marginTop:'24px', paddingTop:'16px', borderTop:'1.5px dashed var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                        <div style={{fontSize:'14px', color:'var(--ink-mid)'}}>
-                                            <strong>Total Estimado:</strong> R$ {
-                                                shoppingLists.find(l => l.id === activeShoppingListId)?.items?.reduce((acc: number, i: any) => acc + (i.estimatedPrice || 0), 0).toFixed(2)
-                                            }
-                                        </div>
-                                        <button 
-                                            onClick={async () => {
-                                                if(window.confirm('Limpar itens comprados?')) {
-                                                    await clearBoughtShoppingItems(activeShoppingListId);
-                                                    setShoppingLists(prev => prev.map(l => ({
-                                                        ...l,
-                                                        items: l.items?.filter((i: any) => !i.isBought)
-                                                    })));
-                                                }
-                                            }}
-                                            style={{background:'transparent', border:'none', color:'var(--coral)', fontSize:'13px', fontWeight:'700', cursor:'pointer'}}
-                                        >
-                                            Limpar comprados
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
                 )}
 
                 {/* ---- CAIXA DE ENTRADA ---- */}
@@ -1909,17 +1596,28 @@ export default function Home() {
 
                 {/* ---- DASHBOARD ---- */}
                 {activeTab === 'Dashboard' && (
-                    <FeatureGate feature="Dashboard">
-                        {currentUserData?.plan === 'PREMIUM' && (
-                            <div style={{background:'var(--coral)',color:'var(--white)',borderRadius:'20px',padding:'24px',marginBottom:'32px',display:'flex',gap:'20px',alignItems:'center',boxShadow:'0 12px 32px rgba(232,80,58,0.15)'}}>
-                                <div style={{fontSize:'40px'}}>✨</div>
-                                <div>
-                                    <h3 style={{fontSize:'20px',marginBottom:'4px',fontWeight:'800',fontFamily:"'Fraunces',serif"}}>Dashboard Premium & Equipe</h3>
-                                    <p style={{fontSize:'14px',opacity:0.9,margin:0,lineHeight:'1.4'}}>Sua taxa de produtividade desta semana está <b>15% superior</b> à média dos seus colaboradores de projetos. A inteligência preditiva sugere focar em "Tarefas de Alta Prioridade" nas próximas 4 horas.</p>
-                                </div>
+                    <>
+                        {currentUserData?.plan === 'FREE' ? (
+                            <div style={{textAlign:'center', padding:'80px 20px', background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)'}}>
+                                <div style={{fontSize:'48px', marginBottom:'16px'}}>🔒</div>
+                                <h2 style={{fontSize:'24px', fontWeight:'800', marginBottom:'16px', color:'var(--ink)',fontFamily:"'Fraunces', serif"}}>Dashboard Bloqueado</h2>
+                                <p style={{color:'var(--ink-mid)', marginBottom:'32px', maxWidth:'400px', margin:'0 auto 32px', fontSize:'15px', lineHeight:'1.5'}}>
+                                    O Dashboard de inteligência e performance da equipe é exclusivo dos planos Pro e Premium. Desbloqueie todo o seu potencial produtivo!
+                                </p>
+                                <button onClick={() => setActiveTab('Planos')} style={{background:'var(--coral)', color:'white', padding:'14px 28px', borderRadius:'12px', fontWeight:'600', cursor:'pointer', border:'none', fontSize:'15px'}}>Fazer Upgrade Agora</button>
                             </div>
-                        )}
-                        <div className="stats-row">
+                        ) : (
+                            <>
+                                {currentUserData?.plan === 'PREMIUM' && (
+                                    <div style={{background:'var(--coral)',color:'var(--white)',borderRadius:'20px',padding:'24px',marginBottom:'32px',display:'flex',gap:'20px',alignItems:'center',boxShadow:'0 12px 32px rgba(232,80,58,0.15)'}}>
+                                        <div style={{fontSize:'40px'}}>✨</div>
+                                        <div>
+                                            <h3 style={{fontSize:'20px',marginBottom:'4px',fontWeight:'800',fontFamily:"'Fraunces',serif"}}>Dashboard Premium & Equipe</h3>
+                                            <p style={{fontSize:'14px',opacity:0.9,margin:0,lineHeight:'1.4'}}>Sua taxa de produtividade desta semana está <b>15% superior</b> à média dos seus colaboradores de projetos. A inteligência preditiva sugere focar em "Tarefas de Alta Prioridade" nas próximas 4 horas.</p>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="stats-row">
                             <div className="stat-card">
                                 <div className="stat-card-label">Total de tarefas</div>
                                 <div className="stat-card-num">{tasks.length}</div>
@@ -1941,9 +1639,8 @@ export default function Home() {
                                 <div className="stat-card-trend">taxa de conclusão</div>
                             </div>
                         </div>
-
                         <div className="section-header" style={{marginTop:'8px'}}><h2>Distribuição por prioridade</h2></div>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'32px'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'24px'}}>
                             {([{label:'Alta',color:'var(--coral)',key:'high'},{label:'Média',color:'var(--amber)',key:'medium'},{label:'Baixa',color:'var(--green)',key:'low'}] as {label:string,color:string,key:string}[]).map(({label,color,key}) => (
                                 <div key={label} style={{background:'var(--cream)',borderRadius:'16px',padding:'20px',textAlign:'center'}}>
                                     <div style={{fontSize:'28px',fontWeight:'700',color,fontFamily:"'Fraunces',serif"}}>{tasks.filter(t=>t.priority===key).length}</div>
@@ -1954,112 +1651,6 @@ export default function Home() {
                                 </div>
                             ))}
                         </div>
-
-                        {/* ---- TIMELINE VISUAL ---- */}
-                        <div className="section-header">
-                            <h2>Cronograma de Hoje (Timeline)</h2>
-                            <div style={{fontSize:'12px', color:'var(--ink-mid)'}}>Visualização de blocos de tempo</div>
-                        </div>
-                        <div style={{background:'var(--white)', borderRadius:'20px', border:'1.5px solid var(--cream-dark)', padding:'24px', marginBottom:'32px', overflowX:'auto'}}>
-                            <div style={{minWidth:'600px', position:'relative', height:'220px', paddingTop:'30px'}}>
-                                {/* Hour markers */}
-                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px', position:'relative'}}>
-                                    {[0,4,8,12,16,20,24].map(h => (
-                                        <div key={h} style={{fontSize:'10px', fontWeight:'700', color:'var(--ink-faint)', width:'20px', textAlign:'center'}}>
-                                            {String(h).padStart(2,'0')}h
-                                        </div>
-                                    ))}
-                                </div>
-                                <div style={{height:'120px', background:'var(--cream)', borderRadius:'12px', position:'relative', border:'1px solid var(--cream-dark)'}}>
-                                    {/* Grid lines */}
-                                    {[4,8,12,16,20].map(h => (
-                                        <div key={h} style={{position:'absolute', left:`${(h/24)*100}%`, top:0, bottom:0, width:'1px', background:'var(--cream-dark)', opacity:0.5}}></div>
-                                    ))}
-
-                                    {/* Task Blocks */}
-                                    {tasks.filter(t => t.date && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0] && t.startTime).map(t => {
-                                        const [h, m] = t.startTime.split(':').map(Number);
-                                        const startPct = ((h + m/60) / 24) * 100;
-                                        const durationH = (t.duration || 60) / 60;
-                                        const widthPct = (durationH / 24) * 100;
-                                        
-                                        return (
-                                            <div key={t.id} style={{
-                                                position:'absolute',
-                                                left:`${startPct}%`,
-                                                width:`${widthPct}%`,
-                                                top:'20px',
-                                                height:'40px',
-                                                background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)',
-                                                borderRadius:'8px',
-                                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                                padding:'4px 8px',
-                                                color:'white',
-                                                fontSize:'11px',
-                                                fontWeight:'600',
-                                                overflow:'hidden',
-                                                whiteSpace:'nowrap',
-                                                textOverflow:'ellipsis',
-                                                zIndex:10,
-                                                cursor:'pointer'
-                                            }} onClick={() => openTaskModal({ taskToEdit: t })}>
-                                                {t.title}
-                                            </div>
-                                        );
-                                    })}
-
-                                    {/* Routine Blocks */}
-                                    {routines.map(r => {
-                                        if(!r.timeSlot || !r.timeSlot.includes('até')) return null;
-                                        const [startStr, endStr] = r.timeSlot.split(' até ');
-                                        const [sh, sm] = startStr.split(':').map(Number);
-                                        const [eh, em] = endStr.split(':').map(Number);
-                                        const startPct = ((sh + (sm||0)/60) / 24) * 100;
-                                        const endPct = ((eh + (em||0)/60) / 24) * 100;
-                                        const widthPct = endPct - startPct;
-
-                                        return (
-                                            <div key={r.id} style={{
-                                                position:'absolute',
-                                                left:`${startPct}%`,
-                                                width:`${widthPct}%`,
-                                                bottom:'20px',
-                                                height:'24px',
-                                                background: `${r.color}33`,
-                                                border:`1px dashed ${r.color}`,
-                                                borderRadius:'6px',
-                                                padding:'2px 6px',
-                                                color: r.color,
-                                                fontSize:'10px',
-                                                fontWeight:'700',
-                                                overflow:'hidden',
-                                                whiteSpace:'nowrap',
-                                                textOverflow:'ellipsis'
-                                            }}>
-                                                {r.name}
-                                            </div>
-                                        );
-                                    })}
-                                    
-                                    {/* Current time marker */}
-                                    {(() => {
-                                        const now = new Date();
-                                        const pct = ((now.getHours() + now.getMinutes()/60) / 24) * 100;
-                                        return (
-                                            <div style={{position:'absolute', left:`${pct}%`, top:'-5px', bottom:'-5px', width:'2px', background:'var(--blue)', zIndex:20}}>
-                                                <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'var(--blue)', position:'absolute', top:'-4px', left:'-3px'}}></div>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                                <div style={{display:'flex', gap:'16px', marginTop:'16px', fontSize:'11px', color:'var(--ink-light)'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}><div style={{width:'8px', height:'8px', borderRadius:'2px', background:'var(--coral)'}}></div> Tarefas</div>
-                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}><div style={{width:'8px', height:'8px', borderRadius:'2px', background:'var(--blue)'}}></div> Agora</div>
-                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}><div style={{width:'8px', height:'8px', borderRadius:'2px', background:'var(--cream-dark)', border:'1px dashed var(--ink-faint)'}}></div> Rotinas</div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="section-header"><h2>Histórico de streaks (Semana Atual)</h2></div>
                         <div style={{background:'var(--cream)',borderRadius:'16px',padding:'20px 24px',marginBottom:'24px'}}>
                             <div style={{display:'flex',gap:'6px',alignItems:'flex-end',height:'60px'}}>
@@ -2126,7 +1717,9 @@ export default function Home() {
                                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)'}}>Nenhuma tarefa pendente ou concluída.</div>
                             )}
                         </div>
-                    </FeatureGate>
+                            </>
+                        )}
+                    </>
                 )}
 
                 {/* ---- MEU PERFIL ---- */}
@@ -2414,34 +2007,44 @@ export default function Home() {
                             Faça o upgrade para desbloquear todos os recursos avançados, projetos ilimitados e integração com outras ferramentas.
                         </p>
 
+                        <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'12px', marginBottom:'40px'}}>
+                            <span style={{fontSize:'14px', fontWeight:'600', color: !billingAnnual ? 'var(--ink)' : 'var(--ink-light)'}}>Mensal</span>
+                            <div className="toggle-switch" onClick={() => setBillingAnnual(!billingAnnual)} style={{width:'50px', height:'28px', background:'var(--cream-dark)', borderRadius:'20px', position:'relative', cursor:'pointer'}}>
+                                <div style={{width:'22px', height:'22px', background:'var(--white)', borderRadius:'50%', position:'absolute', top:'3px', left: billingAnnual ? '25px' : '3px', transition:'all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}></div>
+                            </div>
+                            <span style={{fontSize:'14px', fontWeight:'600', color: billingAnnual ? 'var(--ink)' : 'var(--ink-light)'}}>Anual <span style={{fontSize:'11px', background:'rgba(61,122,94,0.1)', color:'var(--green)', padding:'2px 6px', borderRadius:'10px', marginLeft:'4px'}}>-20%</span></span>
+                        </div>
+
+                        <div style={{background:'rgba(232,80,58,0.05)', borderRadius:'16px', padding:'20px', marginBottom:'40px', border:'1px solid rgba(232,80,58,0.15)'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
+                                <Icons.CheckCircle size={20} color="var(--coral)" />
+                                <span style={{fontWeight:'700', color:'var(--ink)'}}>Nós valorizamos a sua liberdade.</span>
+                            </div>
+                            <p style={{fontSize:'14px', color:'var(--ink-mid)', margin:0, lineHeight:'1.5'}}>
+                                Nosso plano <strong>Free</strong> já oferece tudo o que você precisa para o dia a dia: <strong style={{color:'var(--ink)'}}>Tarefas ilimitadas, Projetos ilimitados, Rotinas e Listas de Compras pra sempre.</strong> Faça upgrade apenas se precisar de mais inteligência (Dashboard), time ou integrações empresariais.
+                            </p>
+                        </div>
+
                         <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:'24px', marginBottom:'40px'}}>
                             {/* Pro Plan */}
                             <div style={{background:'var(--white)', border:'1px solid var(--cream-dark)', borderRadius:'20px', padding:'32px', display:'flex', flexDirection:'column'}}>
                                 <div style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', marginBottom:'4px'}}>Pro</div>
                                 <div style={{fontSize:'14px', color:'var(--ink-light)', marginBottom:'20px'}}>Para acelerar seus resultados.</div>
-                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", color:'var(--ink)', marginBottom:'24px'}}>R$29<span style={{fontSize:'18px',fontWeight:500,color:'var(--ink-mid)'}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', color:'var(--ink-light)', fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", color:'var(--ink)', marginBottom:'24px'}}>R${billingAnnual ? '23' : '29'}<span style={{fontSize:'18px',fontWeight:500,color:'var(--ink-mid)'}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', color:'var(--ink-light)', fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
                                 
                                 <ul style={{listStyle:'none', padding:0, margin:'0 0 32px 0', flex:1, display:'flex', flexDirection:'column', gap:'12px'}}>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Tarefas ilimitadas</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Projetos ilimitados</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Rotinas ilimitadas</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Dashboard avançado</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Compartilhar com até 3 pessoas</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Tudo do plano Free</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Dashboard preditivo de performance</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Compartilhar projetos (até 3 pessoas)</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Relatórios semanais por e-mail</li>
                                 </ul>
                                 <button onClick={async () => {
-                                    const res = await fetch('/api/checkout', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ plan: 'PRO' })
-                                    });
-                                    if(res.ok) {
-                                        const { url } = await res.json();
-                                        window.location.href = url;
-                                    } else {
-                                        const errText = await res.text();
-                                        setSuccessToast('⚠️ Erro Stripe: ' + errText);
-                                        setTimeout(() => setSuccessToast(''), 4000);
-                                    }
+                                    // Simulation of payment
+                                    const res = await adminUpdateUserPlan(currentUserData.id, "PRO");
+                                    setSuccessToast('🎉 Plano Pro ativado com sucesso! Você já pode aproveitar o Dashboard.');
+                                    setTimeout(() => setSuccessToast(''), 4000);
+                                    window.history.replaceState({}, '', '/?checkout=success');
+                                    window.location.reload();
                                 }} style={{background:'var(--cream)', color:'var(--ink)', border:'1px solid var(--cream-dark)', borderRadius:'12px', padding:'14px', fontSize:'14px', fontWeight:'600', cursor:'pointer', width:'100%', transition:'background 0.2s', textAlign:'center'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--cream-dark)')} onMouseLeave={e=>(e.currentTarget.style.background='var(--cream)')}>Assinar Plano Pro</button>
                             </div>
 
@@ -2449,12 +2052,13 @@ export default function Home() {
                             <div style={{background:'var(--coral)', color:'white', borderRadius:'20px', padding:'32px', display:'flex', flexDirection:'column', position:'relative', boxShadow:'0 12px 32px rgba(232,80,58,0.2)'}}>
                                 <div style={{position:'absolute', top:'-12px', right:'32px', background:'var(--white)', color:'var(--coral)', fontSize:'11px', fontWeight:'700', padding:'6px 12px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px'}}>Mais Popular</div>
                                 <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'4px'}}>Premium</div>
-                                <div style={{fontSize:'14px', opacity:0.8, marginBottom:'20px'}}>Produtividade em equipe e AI.</div>
-                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", marginBottom:'24px'}}>R$59<span style={{fontSize:'18px',fontWeight:500,opacity:0.8}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', opacity:0.8, fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                <div style={{fontSize:'14px', opacity:0.8, marginBottom:'20px'}}>Inteligência Artificial & Times.</div>
+                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", marginBottom:'24px'}}>R${billingAnnual ? '47' : '59'}<span style={{fontSize:'18px',fontWeight:500,opacity:0.8}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', opacity:0.8, fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
                                 
                                 <ul style={{listStyle:'none', padding:0, margin:'0 0 32px 0', flex:1, display:'flex', flexDirection:'column', gap:'12px'}}>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Tudo do plano Pro</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Até 5 usuários inclusos</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Compartilhamento ilimitado (Times)</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Inteligência Artificial em breve (Prototipo)</li>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Projetos compartilhados em equipe</li>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Dashboard mais avançado que o Pro</li>
                                 </ul>
@@ -2476,6 +2080,295 @@ export default function Home() {
                             </div>
                         </div>
 
+                    </div>
+                )}
+                
+                {/* ---- MINHAS TAREFAS ---- */}
+                {activeTab === 'Minhas Tarefas' && (
+                    <div style={{maxWidth:'900px'}}>
+                        <div className="section-header">
+                            <h2>Minhas Tarefas</h2>
+                        </div>
+
+                        {/* Filters Bar */}
+                        <div style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'24px', alignItems:'center'}}>
+                            <div style={{flex:'1 1 220px', position:'relative'}}>
+                                <Icons.Search size={15} style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'var(--ink-faint)',pointerEvents:'none'}} />
+                                <input
+                                    style={{width:'100%',padding:'9px 12px 9px 34px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',outline:'none',boxSizing:'border-box'}}
+                                    placeholder="Buscar tarefas..."
+                                    value={taskSearch}
+                                    onChange={e => setTaskSearch(e.target.value)}
+                                />
+                            </div>
+                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterStatus} onChange={e => setTaskFilterStatus(e.target.value as any)}>
+                                <option value="all">Todas</option>
+                                <option value="pending">Pendentes</option>
+                                <option value="done">Concluídas</option>
+                            </select>
+                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value as any)}>
+                                <option value="all">Todas prioridades</option>
+                                <option value="high">Alta</option>
+                                <option value="medium">Média</option>
+                                <option value="low">Baixa</option>
+                            </select>
+                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}>
+                                <option value="all">Todos projetos</option>
+                                <option value="none">Sem projeto</option>
+                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            {bulkSelected.length > 0 && (
+                                <button
+                                    onClick={async () => {
+                                        for (const id of bulkSelected) { await deleteTask(id); }
+                                        const fresh = await getTasks();
+                                        setTasks(fresh);
+                                        setBulkSelected([]);
+                                        setSuccessToast(`🗑️ ${bulkSelected.length} tarefa(s) excluída(s).`);
+                                        setTimeout(() => setSuccessToast(''), 3000);
+                                    }}
+                                    style={{padding:'9px 16px',background:'rgba(232,80,58,0.1)',border:'1.5px solid rgba(232,80,58,0.2)',borderRadius:'10px',fontSize:'13px',fontWeight:'600',color:'var(--coral)',cursor:'pointer'}}
+                                >
+                                    <Icons.Trash2 size={14} style={{display:'inline',marginBottom:'-2px',marginRight:'5px'}} />
+                                    Excluir {bulkSelected.length}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Task list */}
+                        {(() => {
+                            const filtered = tasks.filter((tk: any) => {
+                                const matchSearch = !taskSearch || tk.title.toLowerCase().includes(taskSearch.toLowerCase());
+                                const matchStatus = taskFilterStatus === 'all' || (taskFilterStatus === 'done' ? tk.isDone : !tk.isDone);
+                                const matchPriority = taskFilterPriority === 'all' || tk.priority === taskFilterPriority;
+                                const matchProject = taskFilterProject === 'all' || (taskFilterProject === 'none' ? !tk.projectId : tk.projectId === taskFilterProject);
+                                return matchSearch && matchStatus && matchPriority && matchProject;
+                            });
+                            if (filtered.length === 0) return (
+                                <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)'}}>
+                                    <Icons.ListTodo size={40} style={{marginBottom:'12px',opacity:0.3}} />
+                                    <div style={{fontSize:'15px'}}>Nenhuma tarefa encontrada.</div>
+                                </div>
+                            );
+                            const pending = filtered.filter((tk: any) => !tk.isDone);
+                            const done = filtered.filter((tk: any) => tk.isDone);
+                            const priorityColors: Record<string,string> = {high:'var(--coral)',medium:'var(--amber)',low:'var(--green)'};
+                            const priorityLabels: Record<string,string> = {high:'Alta',medium:'Média',low:'Baixa'};
+                            const renderTask = (tk: any) => (
+                                <div key={tk.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',background:'var(--white)',border:'1.5px solid var(--cream-dark)',borderRadius:'12px',marginBottom:'8px',transition:'border-color 0.2s'}}>
+                                    <input type="checkbox" style={{accentColor:'var(--coral)',width:'16px',height:'16px',flexShrink:0,cursor:'pointer'}}
+                                        checked={bulkSelected.includes(tk.id)}
+                                        onChange={e => { e.stopPropagation(); setBulkSelected((prev: string[]) => prev.includes(tk.id) ? prev.filter((x: string) => x !== tk.id) : [...prev, tk.id]); }}
+                                    />
+                                    <div style={{width:'8px',height:'8px',borderRadius:'50%',background:priorityColors[tk.priority]||'var(--ink-faint)',flexShrink:0}} />
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontSize:'14px',fontWeight:'500',color:'var(--ink)',textDecoration:tk.isDone?'line-through':'none',opacity:tk.isDone?0.5:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tk.title}</div>
+                                        <div style={{display:'flex',gap:'8px',marginTop:'4px',flexWrap:'wrap'}}>
+                                            {tk.date && <span style={{fontSize:'11px',color:'var(--ink-faint)'}}><Icons.Calendar size={10} style={{display:'inline',marginBottom:'-1px'}} /> {new Date(tk.date).toLocaleDateString('pt-BR')}</span>}
+                                            {tk.startTime && <span style={{fontSize:'11px',color:'var(--ink-faint)'}}><Icons.Clock size={10} style={{display:'inline',marginBottom:'-1px'}} /> {tk.startTime}{tk.endTime?` - ${tk.endTime}`:''}</span>}
+                                            {tk.project && <span style={{fontSize:'11px',background:'rgba(0,0,0,0.05)',borderRadius:'4px',padding:'1px 6px',color:'var(--ink-light)'}}>{tk.project.name}</span>}
+                                        </div>
+                                    </div>
+                                    <span style={{fontSize:'11px',fontWeight:'600',color:priorityColors[tk.priority]||'var(--ink-faint)',borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{priorityLabels[tk.priority]||''}</span>
+                                    <button onClick={async (e) => { e.stopPropagation(); await toggleTask(tk.id, !tk.isDone); const fresh = await getTasks(); setTasks(fresh); }} style={{background:'transparent',border:'none',cursor:'pointer',color:tk.isDone?'var(--green)':'var(--ink-faint)',padding:'4px',borderRadius:'6px',transition:'color 0.2s'}}>
+                                        <Icons.CheckCircle size={18} />
+                                    </button>
+                                </div>
+                            );
+                            return (
+                                <div>
+                                    {pending.length > 0 && (
+                                        <div style={{marginBottom:'24px'}}>
+                                            <div style={{fontSize:'12px',fontWeight:'700',color:'var(--ink-light)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'10px'}}>Pendentes ({pending.length})</div>
+                                            {pending.map(renderTask)}
+                                        </div>
+                                    )}
+                                    {done.length > 0 && (
+                                        <div>
+                                            <div style={{fontSize:'12px',fontWeight:'700',color:'var(--ink-light)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'10px'}}>Concluídas ({done.length})</div>
+                                            {done.map(renderTask)}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+
+                {/* ---- LISTA DE COMPRAS ---- */}
+                {activeTab === 'Lista de Compras' && (
+                    <div style={{maxWidth:'860px'}}>
+                        <div className="section-header">
+                            <h2>Lista de Compras</h2>
+                        </div>
+
+                        <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'24px',alignItems:'center'}}>
+                            <select
+                                style={{flex:'1 1 200px',padding:'10px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'14px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}}
+                                value={selectedListId}
+                                onChange={e => setSelectedListId(e.target.value)}
+                            >
+                                {shoppingLists.length === 0 && <option value="">Nenhuma lista</option>}
+                                {shoppingLists.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                            <button
+                                style={{padding:'10px 18px',background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}
+                                onClick={async () => {
+                                    const name = prompt('Nome da nova lista de compras:');
+                                    if (!name?.trim()) return;
+                                    const res = await createShoppingList({ name: name.trim() });
+                                    if ('id' in res) {
+                                        const fresh = await getShoppingLists();
+                                        setShoppingLists(fresh);
+                                        setSelectedListId((res as any).id);
+                                    }
+                                }}
+                            >
+                                <Icons.Plus size={14} style={{display:'inline',marginBottom:'-2px',marginRight:'5px'}} /> Nova lista
+                            </button>
+                            {selectedListId && (
+                                <button
+                                    style={{padding:'10px 14px',background:'rgba(232,80,58,0.08)',border:'1.5px solid rgba(232,80,58,0.2)',borderRadius:'10px',fontSize:'13px',fontWeight:'600',cursor:'pointer',color:'var(--coral)',flexShrink:0}}
+                                    onClick={async () => {
+                                        if (!confirm('Excluir lista e todos os itens?')) return;
+                                        await deleteShoppingList(selectedListId);
+                                        const fresh = await getShoppingLists();
+                                        setShoppingLists(fresh);
+                                        setSelectedListId((fresh as any[])[0]?.id ?? '');
+                                    }}
+                                >
+                                    <Icons.Trash2 size={14} style={{display:'inline',marginBottom:'-2px'}} />
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedListId ? (() => {
+                            const list = (shoppingLists as any[]).find((l: any) => l.id === selectedListId);
+                            if (!list) return null;
+                            const items: any[] = list.items ?? [];
+                            const pendingItems = items.filter((i: any) => !i.purchased);
+                            const purchasedItems = items.filter((i: any) => i.purchased);
+                            const total = items.reduce((acc: number, i: any) => acc + (i.purchased ? 0 : (i.estimatedPrice ?? 0) * (i.quantity ?? 1)), 0);
+                            const catIcons: Record<string,string> = {'Hortifruti':'🥦','Mercearia':'🛒','Limpeza':'🧹','Higiene':'🧴','Bebidas':'🥤','Outros':'📦'};
+                            const cats = ['Hortifruti','Mercearia','Limpeza','Higiene','Bebidas','Outros'];
+                            return (
+                                <div>
+                                    <div style={{background:'var(--white)',border:'1.5px solid var(--cream-dark)',borderRadius:'16px',padding:'20px',marginBottom:'24px'}}>
+                                        <div style={{fontSize:'13px',fontWeight:'700',color:'var(--ink)',marginBottom:'14px'}}>Adicionar item</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'2fr 80px 100px 160px auto',gap:'10px',alignItems:'end'}}>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Produto</div>
+                                                <input className="modal-input" style={{margin:0}} placeholder="Ex: Leite" value={newItemName} onChange={e => setNewItemName(e.target.value)} onKeyDown={e => { if(e.key==='Enter'){document.getElementById('addItemBtn')?.click();}}} />
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Qtd</div>
+                                                <input className="modal-input" style={{margin:0}} type="number" min="0.1" step="0.1" placeholder="1" value={newItemQuantity} onChange={e => setNewItemQuantity(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Unidade</div>
+                                                <select className="modal-select modal-input" style={{margin:0}} value={newItemUnit} onChange={e => setNewItemUnit(e.target.value)}>
+                                                    <option>un</option><option>kg</option><option>g</option><option>L</option><option>ml</option><option>cx</option><option>pct</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Categoria</div>
+                                                <select className="modal-select modal-input" style={{margin:0}} value={newItemCategory} onChange={e => setNewItemCategory(e.target.value)}>
+                                                    {cats.map(c => <option key={c}>{c}</option>)}
+                                                </select>
+                                            </div>
+                                            <button id="addItemBtn"
+                                                style={{padding:'10px 16px',background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:'700',cursor:'pointer',alignSelf:'end',whiteSpace:'nowrap'}}
+                                                onClick={async () => {
+                                                    if (!newItemName.trim()) return;
+                                                    await createShoppingItem(selectedListId, {
+                                                        name: newItemName.trim(),
+                                                        quantity: parseFloat(newItemQuantity) || 1,
+                                                        unit: newItemUnit,
+                                                        category: newItemCategory,
+                                                        estimatedPrice: newItemPrice ? parseFloat(newItemPrice) : undefined,
+                                                    });
+                                                    const fresh = await getShoppingLists();
+                                                    setShoppingLists(fresh);
+                                                    setNewItemName(''); setNewItemQuantity('1'); setNewItemUnit('un'); setNewItemCategory('Hortifruti'); setNewItemPrice('');
+                                                }}
+                                            >
+                                                <Icons.Plus size={16} style={{display:'inline',marginBottom:'-2px'}} /> Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {total > 0 && (
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px',marginBottom:'16px',fontSize:'14px',color:'var(--ink-mid)'}}>
+                                            <Icons.DollarSign size={15} style={{color:'var(--green)'}} />
+                                            <span>Total estimado (pendentes): <strong style={{color:'var(--ink)'}}>R$ {total.toFixed(2).replace('.',',')}</strong></span>
+                                        </div>
+                                    )}
+
+                                    {pendingItems.length > 0 && (
+                                        <div style={{marginBottom:'24px'}}>
+                                            {cats.map(cat => {
+                                                const catItems = pendingItems.filter((i: any) => i.category === cat);
+                                                if (catItems.length === 0) return null;
+                                                return (
+                                                    <div key={cat} style={{marginBottom:'16px'}}>
+                                                        <div style={{fontSize:'12px',fontWeight:'700',color:'var(--ink-light)',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'8px'}}>{catIcons[cat]} {cat}</div>
+                                                        {catItems.map((item: any) => (
+                                                            <div key={item.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 16px',background:'var(--white)',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',marginBottom:'6px'}}>
+                                                                <button
+                                                                    onClick={async () => { await toggleShoppingItem(item.id, true); const f = await getShoppingLists(); setShoppingLists(f); }}
+                                                                    style={{width:'22px',height:'22px',borderRadius:'50%',border:'2px solid var(--cream-dark)',background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s'}}
+                                                                    onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--green)';e.currentTarget.style.background='rgba(61,122,94,0.08)';}}
+                                                                    onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--cream-dark)';e.currentTarget.style.background='transparent';}}
+                                                                ></button>
+                                                                <div style={{flex:1}}>
+                                                                    <div style={{fontSize:'14px',fontWeight:'500',color:'var(--ink)'}}>{item.name}</div>
+                                                                    <div style={{fontSize:'12px',color:'var(--ink-faint)'}}>{item.quantity} {item.unit}{item.estimatedPrice ? ` · R$ ${(item.estimatedPrice * item.quantity).toFixed(2).replace('.',',')}` : ''}</div>
+                                                                </div>
+                                                                <button onClick={async () => { await deleteShoppingItem(item.id); const f = await getShoppingLists(); setShoppingLists(f); }} style={{background:'transparent',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'4px',borderRadius:'6px'}}>
+                                                                    <Icons.X size={14} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {pendingItems.length === 0 && purchasedItems.length === 0 && (
+                                        <div style={{textAlign:'center',padding:'48px 20px',color:'var(--ink-faint)'}}>
+                                            <Icons.ShoppingCart size={40} style={{marginBottom:'12px',opacity:0.25}} />
+                                            <div>Nenhum item ainda. Adicione acima!</div>
+                                        </div>
+                                    )}
+
+                                    {purchasedItems.length > 0 && (
+                                        <div style={{opacity:0.6}}>
+                                            <div style={{fontSize:'12px',fontWeight:'700',color:'var(--green)',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'10px'}}>Comprados ({purchasedItems.length})</div>
+                                            {purchasedItems.map((item: any) => (
+                                                <div key={item.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 16px',background:'var(--cream)',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',marginBottom:'6px'}}>
+                                                    <div style={{width:'22px',height:'22px',borderRadius:'50%',background:'var(--green)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                                        <Icons.Check size={12} color="white" strokeWidth={3} />
+                                                    </div>
+                                                    <div style={{flex:1,textDecoration:'line-through',fontSize:'14px',color:'var(--ink-light)'}}>{item.name} · {item.quantity} {item.unit}</div>
+                                                    <button onClick={async () => { await toggleShoppingItem(item.id, false); const f = await getShoppingLists(); setShoppingLists(f); }} style={{background:'transparent',border:'none',cursor:'pointer',color:'var(--ink-faint)',fontSize:'12px'}}>
+                                                        Desfazer
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })() : (
+                            <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)'}}>
+                                <Icons.ShoppingCart size={40} style={{marginBottom:'12px',opacity:0.3}} />
+                                <div style={{fontSize:'15px',marginBottom:'16px'}}>Nenhuma lista criada ainda.</div>
+                                <button onClick={async () => { const name = prompt('Nome da lista:'); if(!name?.trim()) return; const res = await createShoppingList({name:name.trim()}); if('id' in res){const fresh = await getShoppingLists(); setShoppingLists(fresh); setSelectedListId((res as any).id);} }} style={{padding:'12px 24px',background:'var(--coral)',color:'white',border:'none',borderRadius:'12px',fontSize:'14px',fontWeight:'600',cursor:'pointer'}}>
+                                    <Icons.Plus size={14} style={{display:'inline',marginBottom:'-2px',marginRight:'5px'}} /> Criar primeira lista
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -2506,29 +2399,6 @@ export default function Home() {
                         <option value="3h+">Mais de 3h</option>
                     </select>
                 </div>
-            </div>
-            <div className="modal-row">
-                <div className="modal-field">
-                    <div className="modal-label">Horário de Início</div>
-                    <input className="modal-input" type="time" value={newTaskStartTime} onChange={e => setNewTaskStartTime(e.target.value)} />
-                </div>
-                <div className="modal-field">
-                    <div className="modal-label">Duração</div>
-                    <select className="modal-select modal-input" value={newTaskDuration} onChange={e => setNewTaskDuration(Number(e.target.value))}>
-                        <option value={15}>15 min</option>
-                        <option value={30}>30 min</option>
-                        <option value={45}>45 min</option>
-                        <option value={60}>1 hora</option>
-                        <option value={120}>2 horas</option>
-                        <option value={180}>3 horas</option>
-                    </select>
-                </div>
-            </div>
-            <div className="modal-field" style={{marginTop:'4px', marginBottom:'12px'}}>
-                <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'13px', color:'var(--ink-mid)'}}>
-                    <input type="checkbox" checked={newTaskReminder} onChange={e => setNewTaskReminder(e.target.checked)} style={{accentColor:'var(--coral)'}} />
-                    Ativar lembrete automático
-                </label>
             </div>
             <div className="modal-row">
                 <div className="modal-field">

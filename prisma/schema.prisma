@@ -54,7 +54,6 @@ model User {
   projects      Project[]
   sharedProjects Project[] @relation("ProjectCollaborators")
   shoppingLists ShoppingList[]
-  subscription  Subscription?
 
   // Admin & Billing
   role             String    @default("USER") // USER, ADMIN
@@ -63,18 +62,7 @@ model User {
   stripeCustomerId String?
 }
 
-model Subscription {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  plan               String   @default("FREE")
-  status             String   @default("ACTIVE")
-  currentPeriodEnd   DateTime?
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-}
-
-model ModelVerificationToken {
+model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
@@ -110,10 +98,8 @@ model Task {
   priority    String   @default("low") // high, medium, low
   date        DateTime?
   time        String?
-  startTime   String?
-  endTime     String?
-  duration    Int?     // in minutes
-  reminderAt  Int?     // minutes before
+  startTime   String?  // HH:MM format
+  endTime     String?  // HH:MM format
   routineName String?
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -124,25 +110,23 @@ model Task {
 }
 
 model ShoppingList {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   name      String
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items     ShoppingItem[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime       @default(now())
 }
 
 model ShoppingItem {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
-  quantity       Float    @default(1)
-  unit           String   @default("un")
-  category       String   @default("Outros")
+  quantity       Float        @default(1)
+  unit           String       @default("un") // un, kg, L, g, ml, cx, pct
+  category       String       @default("Outros") // Hortifruti, Mercearia, Limpeza, Higiene, Bebidas, Outros
   estimatedPrice Float?
-  isBought       Boolean  @default(false)
+  isPurchased    Boolean      @default(false)
   listId         String
   list           ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime     @default(now())
 }
