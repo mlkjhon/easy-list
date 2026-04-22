@@ -1545,7 +1545,7 @@
 
         .ob-impact-label {
             font-size: 16px;
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.85);
             margin-bottom: 40px;
         }
 
@@ -1586,7 +1586,7 @@
 
         .ob-preview-text {
             font-size: 13px;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.9);
         }
 
         .ob-preview-tag {
@@ -1595,8 +1595,8 @@
             font-weight: 500;
             padding: 2px 8px;
             border-radius: 100px;
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.85);
         }
 
         /* ─── APP INTERFACE ─── */

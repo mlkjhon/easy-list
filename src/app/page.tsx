@@ -8,7 +8,9 @@ import {
   getProjects, createProject, deleteProject,
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
-  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject
+  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject,
+  getShoppingLists, createShoppingList, deleteShoppingList, duplicateShoppingList,
+  createShoppingItem, toggleShoppingItem, deleteShoppingItem, clearBoughtShoppingItems, activatePlan
 } from "./actions";
 
 export default function Home() {
@@ -28,15 +30,25 @@ export default function Home() {
 
   // Tasks
   const [tasks, setTasks] = useState<any[]>([]);
+  const [shoppingLists, setShoppingLists] = useState<any[]>([]);
+  const [activeShoppingListId, setActiveShoppingListId] = useState<string | null>(null);
+  const [newShoppingItemTitle, setNewShoppingItemTitle] = useState("");
+  const [newShoppingItemQty, setNewShoppingItemQty] = useState("1");
+  const [newShoppingItemUnit, setNewShoppingItemUnit] = useState("un");
+  const [newShoppingItemCategory, setNewShoppingItemCategory] = useState("Mercearia");
+  const [newShoppingItemPrice, setNewShoppingItemPrice] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDate, setNewTaskDate] = useState("");
   const [newTaskTime, setNewTaskTime] = useState("");
+  const [newTaskStartTime, setNewTaskStartTime] = useState("");
+  const [newTaskDuration, setNewTaskDuration] = useState("");
+  const [newTaskReminder, setNewTaskReminder] = useState("");
   const [newTaskRoutine, setNewTaskRoutine] = useState("");
-  const [presetProjectId, setPresetProjectId] = useState<string|null>(null);
+  const [presetProjectId, setPresetProjectId] = useState<string | null>(null);
   const [presetImportant, setPresetImportant] = useState(false);
-  const [editTaskId, setEditTaskId] = useState<string|null>(null);
+  const [editTaskId, setEditTaskId] = useState<string | null>(null);
   
   // UI Globals
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -230,6 +242,9 @@ export default function Home() {
       setNewTaskPriority(opts.taskToEdit.priority);
       setNewTaskDate(opts.taskToEdit.date ? new Date(opts.taskToEdit.date).toISOString().split('T')[0] : "");
       setNewTaskTime(opts.taskToEdit.time || "");
+      setNewTaskStartTime(opts.taskToEdit.startTime || "");
+      setNewTaskDuration(opts.taskToEdit.duration || "");
+      setNewTaskReminder(opts.taskToEdit.reminderAt || "");
       setNewTaskRoutine(opts.taskToEdit.routineName || "");
       setPresetProjectId(opts.taskToEdit.projectId || null);
       setPresetImportant(opts.taskToEdit.priority === 'high');
@@ -241,6 +256,9 @@ export default function Home() {
     setNewTaskPriority(opts?.priority || "medium");
     setNewTaskDate(opts?.date || "");
     setNewTaskTime("");
+    setNewTaskStartTime("");
+    setNewTaskDuration("");
+    setNewTaskReminder("");
     setNewTaskRoutine("");
     setPresetProjectId(opts?.projectId || null);
     setPresetImportant(opts?.important || false);
@@ -252,37 +270,92 @@ export default function Home() {
 
   const handleSaveTask = async () => {
     if (!newTaskTitle.trim()) return;
-    
-    const taskData = {
-      title: newTaskTitle,
-      priority: presetImportant ? 'high' : newTaskPriority,
-      time: newTaskTime || undefined,
-      date: newTaskDate || undefined,
-      routineName: newTaskRoutine || undefined,
-      projectId: presetProjectId || undefined,
-    };
-
     try {
+      const taskData = {
+        title: newTaskTitle.trim(),
+        priority: newTaskPriority,
+        date: newTaskDate || null,
+        time: newTaskTime || null,
+        startTime: newTaskStartTime || null,
+        duration: newTaskDuration || null,
+        reminderAt: newTaskReminder || null,
+        projectId: presetProjectId,
+        routineName: newTaskRoutine || null
+      };
+
       if (editTaskId) {
-        const uTask = await updateTask(editTaskId, taskData);
-        setTasks(prev => prev.map(tk => tk.id === editTaskId ? uTask : tk));
+        await updateTask(editTaskId, taskData);
+        setTasks(prev => prev.map(tk => tk.id === editTaskId ? { ...tk, ...taskData } : tk));
+        setSuccessToast(lang === 'pt' ? 'Tarefa atualizada!' : lang === 'es' ? 'Tarea actualizada!' : 'Task updated!');
       } else {
-        const uTask = await createTask(taskData);
-        setTasks(prev => [uTask, ...prev]);
+        const newTask = await createTask(taskData);
+        setTasks(prev => [...prev, newTask]);
+        setSuccessToast(lang === 'pt' ? 'Tarefa criada!' : lang === 'es' ? 'Tarea creada!' : 'Task created!');
       }
-      
       setIsModalOpen(false);
-      setNewTaskTitle("");
-      setEditTaskId(null);
+      setTimeout(() => setSuccessToast(''), 3000);
       refreshStats();
     } catch (err: any) {
-      setSuccessToast('⚠️ ' + (err.message || 'Erro ao salvar tarefa. Tente novamente.'));
+      setSuccessToast('⚠️ ' + (err.message || 'Erro ao salvar tarefa.'));
+      setTimeout(() => setSuccessToast(''), 4000);
+      if (err.message?.includes('limite')) setActiveTab('Planos');
+    }
+  };
+
+  // --- Shopping List Handlers ---
+  const loadShoppingLists = async () => {
+    try {
+      const lists = await getShoppingLists();
+      setShoppingLists(lists);
+      if (lists.length > 0 && !activeShoppingListId) {
+        setActiveShoppingListId(lists[0].id);
+      }
+    } catch (e) { /* silent */ }
+  };
+
+  const handleCreateShoppingList = async (name: string) => {
+    try {
+      const newList = await createShoppingList(name);
+      setShoppingLists(prev => [...prev, newList]);
+      setActiveShoppingListId(newList.id);
+    } catch (err: any) {
+      setSuccessToast('⚠️ ' + (err.message || 'Erro ao criar lista.'));
       setTimeout(() => setSuccessToast(''), 4000);
     }
   };
 
+  const handleAddShoppingItem = async () => {
+    if (!activeShoppingListId || !newShoppingItemTitle.trim()) return;
+    try {
+      const item = await createShoppingItem({
+        listId: activeShoppingListId,
+        name: newShoppingItemTitle.trim(),
+        quantity: parseFloat(newShoppingItemQty) || 1,
+        unit: newShoppingItemUnit,
+        category: newShoppingItemCategory,
+        priceEstimated: newShoppingItemPrice ? parseFloat(newShoppingItemPrice) : null
+      });
+      setShoppingLists(prev => prev.map(l => l.id === activeShoppingListId ? { ...l, items: [...(l.items || []), item] } : l));
+      setNewShoppingItemTitle("");
+      setNewShoppingItemQty("1");
+      setNewShoppingItemPrice("");
+    } catch (err: any) {
+      setSuccessToast('⚠️ ' + (err.message || 'Erro ao adicionar item.'));
+      setTimeout(() => setSuccessToast(''), 4000);
+    }
+  };
+
+  const handleToggleShoppingItem = async (itemId: string, currentStatus: boolean) => {
+    try {
+      await toggleShoppingItem(itemId, !currentStatus);
+      setShoppingLists(prev => prev.map(l => ({
+        ...l,
+        items: l.items?.map((i: any) => i.id === itemId ? { ...i, isBought: !currentStatus } : i)
+      })));
+    } catch (e) { /* silent */ }
+  };
+
   const isTaskLocked = (t: any) => activeTab === 'Esta Semana' && t.date && new Date(t.date).toISOString().split('T')[0] > new Date().toISOString().split('T')[0];
-  const isTaskOverdue = (t: any) => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
 
   const getExpirationText = (t: any) => {
     if (t.isDone || !t.date) return null;
@@ -294,6 +367,35 @@ export default function Home() {
     if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira amanhã {t.time ? `às ${t.time}` : ''}</span>;
     if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira em {daysDiff} dias</span>;
     return null;
+  };
+
+  const isTaskOverdue = (t: any) => {
+    if (t.isDone || !t.date) return false;
+    const today = new Date().toISOString().split('T')[0];
+    const taskDate = new Date(t.date).toISOString().split('T')[0];
+    return taskDate < today;
+  };
+
+  const FeatureGate = ({ feature, children, fallback }: any) => {
+    const plan = currentUserData?.plan || 'FREE';
+    let isLocked = false;
+    
+    if (feature === 'Dashboard') isLocked = plan === 'FREE';
+    if (feature === 'RoutinesLimit') isLocked = plan === 'FREE' && routines.length >= 3;
+    if (feature === 'Collaboration') isLocked = plan === 'FREE';
+    
+    if (isLocked) return fallback || (
+        <div style={{textAlign:'center', padding:'60px 24px', background:'var(--white)', borderRadius:'24px', border:'1px dashed var(--coral)', boxShadow:'0 10px 30px rgba(0,0,0,0.05)'}}>
+            <div style={{fontSize:'48px', marginBottom:'16px'}}>🔒</div>
+            <h3 style={{fontSize:'20px', fontWeight:'800', marginBottom:'12px', color:'var(--ink)', fontFamily:"'Fraunces', serif"}}>Recurso Premium</h3>
+            <p style={{color:'var(--ink-mid)', marginBottom:'24px', maxWidth:'320px', margin:'0 auto 24px', fontSize:'14px', lineHeight:'1.5'}}>
+                Esta funcionalidade está disponível apenas nos planos <b>Pro</b> e <b>Premium</b>. Desbloqueie todo o seu potencial!
+            </p>
+            <button onClick={() => setActiveTab('Planos')} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'10px 24px', fontSize:'14px', fontWeight:'700', cursor:'pointer', transition:'all 0.2s'}} onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.05)')} onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}>Ver Planos</button>
+        </div>
+    );
+    
+    return children;
   };
 
   const renderTaskItem = (t: any) => {
@@ -320,8 +422,11 @@ export default function Home() {
           <div className="task-meta">
             <div className="task-project-dot" style={{background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)'}}></div>
             <span>{t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Média' : 'Baixa'}</span>
-            {t.time && <span>· {t.time}</span>}
-            {t.routineName && <span>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
+            {t.startTime && (
+              <span style={{color:'var(--blue)', fontWeight:'600'}}>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.startTime}</span>
+            )}
+            {t.time && !t.startTime && <span>· {t.time}</span>}
+            {t.routineName && <span>· <Icons.Zap size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
             {t.projectId && <span>· <Icons.Folder size={12} style={{display:'inline',marginBottom:'-2px'}}/> {projects.find((p:any)=>p.id===t.projectId)?.name || 'Projeto'}</span>}
             {locked && <span style={{color:'var(--ink-light)'}}>· 🔒 Futuro</span>}
             {overdue && <span style={{color:'var(--coral)', fontWeight:'600'}}>· ⚠️ Atrasada ({new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>}
@@ -353,7 +458,6 @@ export default function Home() {
                 onMouseLeave={e=>(e.currentTarget.style.background='transparent', e.currentTarget.style.color='var(--ink-faint)')}>
                 <Icons.Trash2 size={14} strokeWidth={1.5} />
             </button>
-            <div className="priority-bar" style={{background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)'}}></div>
         </div>
       </div>
     );
@@ -1069,6 +1173,10 @@ export default function Home() {
                         <Icons.BarChart2 size={18} className="sidebar-item-icon" />
                         {t('dashboard', lang)}
                     </div>
+                    <div className={`sidebar-item ${activeTab === 'Compras' ? 'active' : ''}`} onClick={() => { setActiveTab('Compras'); loadShoppingLists(); }}>
+                        <Icons.ShoppingCart size={18} className="sidebar-item-icon" />
+                        {lang === 'pt' ? 'Lista de Compras' : lang === 'es' ? 'Lista de Compras' : 'Shopping List'}
+                    </div>
                     <div className={`sidebar-item ${activeTab === 'Planos' ? 'active' : ''}`} onClick={() => setActiveTab('Planos')}>
                         <Icons.CreditCard size={18} className="sidebar-item-icon" />
                         {t('plans', lang)}
@@ -1329,6 +1437,253 @@ export default function Home() {
                     </>
                 )}
 
+                {activeTab === 'Compras' && (
+                    <div className="shopping-screen">
+                        <style jsx>{`
+                            .shopping-screen {
+                                animation: fadeIn var(--duration) var(--ease);
+                            }
+                            .shopping-grid {
+                                display: grid;
+                                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                                gap: 20px;
+                            }
+                            .shopping-list-card {
+                                background: var(--white);
+                                border-radius: 16px;
+                                border: 1.5px solid var(--cream-dark);
+                                padding: 20px;
+                                transition: all var(--duration) var(--ease);
+                                cursor: pointer;
+                            }
+                            .shopping-list-card:hover {
+                                transform: translateY(-4px);
+                                border-color: var(--coral-light);
+                                box-shadow: var(--shadow-sm);
+                            }
+                            .shopping-list-card.active {
+                                border-color: var(--coral);
+                                background: rgba(232,80,58,0.02);
+                            }
+                            .item-row {
+                                display: flex;
+                                alignItems: center;
+                                gap: 12px;
+                                padding: 8px 0;
+                                border-bottom: 1px solid var(--cream);
+                            }
+                            .item-row:last-child {
+                                border-bottom: none;
+                            }
+                            .category-badge {
+                                font-size: 10px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.5px;
+                                font-weight: 700;
+                                padding: 2px 6px;
+                                borderRadius: 6px;
+                                background: var(--cream);
+                                color: var(--ink-mid);
+                            }
+                        `}</style>
+
+                        {!activeShoppingListId ? (
+                            <>
+                                <div className="section-header">
+                                    <h2>Minhas Listas de Compras</h2>
+                                    <button className="app-add-btn" onClick={() => handleCreateShoppingList(lang === 'pt' ? 'Nova Lista' : 'New List')}>
+                                        <Icons.Plus size={16} /> Nova Lista
+                                    </button>
+                                </div>
+                                <div className="shopping-grid">
+                                    {shoppingLists.length === 0 && (
+                                        <div style={{textAlign:'center', padding:'60px 20px', color:'var(--ink-faint)', gridColumn:'1/-1'}}>
+                                            <Icons.ShoppingCart size={48} strokeWidth={1} style={{margin:'0 auto 16px', display:'block'}} />
+                                            Nenhuma lista de compras ainda. Que tal criar uma agora?
+                                        </div>
+                                    )}
+                                    {shoppingLists.map((list: any) => (
+                                        <div key={list.id} className="shopping-list-card" onClick={() => setActiveShoppingListId(list.id)}>
+                                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'12px'}}>
+                                                <h3 style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', margin:0}}>{list.name}</h3>
+                                                <Icons.ChevronRight size={18} color="var(--ink-faint)" />
+                                            </div>
+                                            <div style={{fontSize:'13px', color:'var(--ink-light)', display:'flex', gap:'12px'}}>
+                                                <span>{list.items?.length || 0} itens</span>
+                                                {list.items?.filter((i:any)=>i.isBought).length > 0 && (
+                                                    <span style={{color:'var(--green)'}}>{list.items.filter((i:any)=>i.isBought).length} comprados</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="section-header">
+                                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                        <button onClick={() => setActiveShoppingListId(null)} style={{background:'transparent', border:'none', cursor:'pointer', color:'var(--ink-mid)'}}>
+                                            <Icons.ArrowLeft size={20} />
+                                        </button>
+                                        <h2 style={{margin:0}}>{shoppingLists.find(l => l.id === activeShoppingListId)?.name}</h2>
+                                    </div>
+                                    <div style={{display:'flex', gap:'12px'}}>
+                                        <button onClick={() => {
+                                            const list = shoppingLists.find(l => l.id === activeShoppingListId);
+                                            if(list) handleCreateShoppingList(`${list.name} (Cópia)`);
+                                        }} style={{background:'var(--cream)', border:'1.5px solid var(--cream-dark)', borderRadius:'10px', padding:'6px 12px', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>Duplicar</button>
+                                        <button onClick={async () => {
+                                            if(window.confirm('Excluir esta lista?')) {
+                                                await deleteShoppingList(activeShoppingListId);
+                                                setShoppingLists(prev => prev.filter(l => l.id !== activeShoppingListId));
+                                                setActiveShoppingListId(null);
+                                            }
+                                        }} style={{background:'transparent', border:'1.5px solid #ff4d4d22', color:'#ff4d4d', borderRadius:'10px', padding:'6px 12px', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}>Excluir</button>
+                                    </div>
+                                </div>
+
+                                <div style={{background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', padding:'24px', marginBottom:'24px'}}>
+                                    <div style={{display:'grid', gridTemplateColumns:'1fr auto auto auto auto auto', gap:'12px', marginBottom:'20px'}}>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Nome do produto..." 
+                                            value={newItemName}
+                                            onChange={(e) => setNewItemName(e.target.value)}
+                                            style={{background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px 14px', fontSize:'14px'}}
+                                        />
+                                        <input 
+                                            type="number" 
+                                            placeholder="Qtd" 
+                                            value={newItemQty}
+                                            onChange={(e) => setNewItemQty(Number(e.target.value))}
+                                            style={{width:'60px', background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
+                                        />
+                                        <select 
+                                            value={newItemUnit}
+                                            onChange={(e) => setNewItemUnit(e.target.value)}
+                                            style={{background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
+                                        >
+                                            <option value="un">un</option>
+                                            <option value="kg">kg</option>
+                                            <option value="g">g</option>
+                                            <option value="L">L</option>
+                                            <option value="ml">ml</option>
+                                            <option value="pc">pc</option>
+                                        </select>
+                                        <select 
+                                            value={newItemCategory}
+                                            onChange={(e) => setNewItemCategory(e.target.value)}
+                                            style={{background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
+                                        >
+                                            <option value="Hortifruti">🍎 Hortifruti</option>
+                                            <option value="Mercearia">🍞 Mercearia</option>
+                                            <option value="Limpeza">🧼 Limpeza</option>
+                                            <option value="Higiene">🪥 Higiene</option>
+                                            <option value="Bebidas">🥤 Bebidas</option>
+                                            <option value="Outros">📦 Outros</option>
+                                        </select>
+                                        <input 
+                                            type="number" 
+                                            placeholder="R$" 
+                                            value={newItemPrice || ''}
+                                            onChange={(e) => setNewItemPrice(Number(e.target.value))}
+                                            style={{width:'80px', background:'var(--cream)', border:'1px solid var(--cream-dark)', borderRadius:'10px', padding:'10px', fontSize:'14px'}}
+                                        />
+                                        <button 
+                                            onClick={handleAddShoppingItem}
+                                            style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'10px 20px', fontWeight:'700', cursor:'pointer'}}
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+
+                                    {/* Grouped items */}
+                                    {(() => {
+                                        const list = shoppingLists.find(l => l.id === activeShoppingListId);
+                                        if(!list || !list.items) return null;
+                                        const categories = ["Hortifruti", "Mercearia", "Limpeza", "Higiene", "Bebidas", "Outros"];
+                                        
+                                        return categories.map(cat => {
+                                            const items = list.items.filter((i: any) => i.category === cat);
+                                            if (items.length === 0) return null;
+                                            
+                                            // Sort: non-bought first, then bought
+                                            const sortedItems = [...items].sort((a,b) => (a.isBought === b.isBought) ? 0 : a.isBought ? 1 : -1);
+
+                                            return (
+                                                <div key={cat} style={{marginBottom:'24px'}}>
+                                                    <div style={{fontSize:'12px', fontWeight:'800', color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
+                                                        <span>{cat}</span>
+                                                        <div style={{flex:1, height:'1px', background:'var(--cream-dark)'}}></div>
+                                                    </div>
+                                                    {sortedItems.map((item: any) => (
+                                                        <div key={item.id} className="item-row" style={{opacity: item.isBought ? 0.6 : 1}}>
+                                                            <div 
+                                                                className="task-checkbox" 
+                                                                style={{
+                                                                    background: item.isBought ? 'var(--coral)' : 'transparent',
+                                                                    borderColor: item.isBought ? 'var(--coral)' : 'var(--cream-dark)',
+                                                                    cursor:'pointer'
+                                                                }}
+                                                                onClick={() => handleToggleShoppingItem(item.id, item.isBought)}
+                                                            >
+                                                                {item.isBought && <Icons.Check size={14} color="white" />}
+                                                            </div>
+                                                            <div style={{flex:1, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                                <div>
+                                                                    <span style={{fontSize:'15px', color:'var(--ink)', fontWeight:'500', textDecoration: item.isBought ? 'line-through' : 'none'}}>{item.name}</span>
+                                                                    <span style={{fontSize:'12px', color:'var(--ink-light)', marginLeft:'8px'}}>{item.quantity} {item.unit}</span>
+                                                                </div>
+                                                                <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+                                                                    {item.estimatedPrice > 0 && <span style={{fontSize:'13px', fontWeight:'600', color:'var(--green)'}}>R$ {item.estimatedPrice.toFixed(2)}</span>}
+                                                                    <button 
+                                                                        onClick={async () => {
+                                                                            await deleteShoppingItem(item.id);
+                                                                            setShoppingLists(prev => prev.map(l => ({
+                                                                                ...l,
+                                                                                items: l.items?.filter((i: any) => i.id !== item.id)
+                                                                            })));
+                                                                        }}
+                                                                        style={{background:'transparent', border:'none', color:'var(--ink-faint)', cursor:'pointer', padding:'4px'}}
+                                                                    >
+                                                                        <Icons.Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+
+                                    <div style={{marginTop:'24px', paddingTop:'16px', borderTop:'1.5px dashed var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                        <div style={{fontSize:'14px', color:'var(--ink-mid)'}}>
+                                            <strong>Total Estimado:</strong> R$ {
+                                                shoppingLists.find(l => l.id === activeShoppingListId)?.items?.reduce((acc: number, i: any) => acc + (i.estimatedPrice || 0), 0).toFixed(2)
+                                            }
+                                        </div>
+                                        <button 
+                                            onClick={async () => {
+                                                if(window.confirm('Limpar itens comprados?')) {
+                                                    await clearBoughtShoppingItems(activeShoppingListId);
+                                                    setShoppingLists(prev => prev.map(l => ({
+                                                        ...l,
+                                                        items: l.items?.filter((i: any) => !i.isBought)
+                                                    })));
+                                                }
+                                            }}
+                                            style={{background:'transparent', border:'none', color:'var(--coral)', fontSize:'13px', fontWeight:'700', cursor:'pointer'}}
+                                        >
+                                            Limpar comprados
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
                 {/* ---- CAIXA DE ENTRADA ---- */}
                 {activeTab === 'Caixa de Entrada' && (
                     <>
@@ -1554,28 +1909,17 @@ export default function Home() {
 
                 {/* ---- DASHBOARD ---- */}
                 {activeTab === 'Dashboard' && (
-                    <>
-                        {currentUserData?.plan === 'FREE' ? (
-                            <div style={{textAlign:'center', padding:'80px 20px', background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)'}}>
-                                <div style={{fontSize:'48px', marginBottom:'16px'}}>🔒</div>
-                                <h2 style={{fontSize:'24px', fontWeight:'800', marginBottom:'16px', color:'var(--ink)',fontFamily:"'Fraunces', serif"}}>Dashboard Bloqueado</h2>
-                                <p style={{color:'var(--ink-mid)', marginBottom:'32px', maxWidth:'400px', margin:'0 auto 32px', fontSize:'15px', lineHeight:'1.5'}}>
-                                    O Dashboard de inteligência e performance da equipe é exclusivo dos planos Pro e Premium. Desbloqueie todo o seu potencial produtivo!
-                                </p>
-                                <button onClick={() => setActiveTab('Planos')} style={{background:'var(--coral)', color:'white', padding:'14px 28px', borderRadius:'12px', fontWeight:'600', cursor:'pointer', border:'none', fontSize:'15px'}}>Fazer Upgrade Agora</button>
+                    <FeatureGate feature="Dashboard">
+                        {currentUserData?.plan === 'PREMIUM' && (
+                            <div style={{background:'var(--coral)',color:'var(--white)',borderRadius:'20px',padding:'24px',marginBottom:'32px',display:'flex',gap:'20px',alignItems:'center',boxShadow:'0 12px 32px rgba(232,80,58,0.15)'}}>
+                                <div style={{fontSize:'40px'}}>✨</div>
+                                <div>
+                                    <h3 style={{fontSize:'20px',marginBottom:'4px',fontWeight:'800',fontFamily:"'Fraunces',serif"}}>Dashboard Premium & Equipe</h3>
+                                    <p style={{fontSize:'14px',opacity:0.9,margin:0,lineHeight:'1.4'}}>Sua taxa de produtividade desta semana está <b>15% superior</b> à média dos seus colaboradores de projetos. A inteligência preditiva sugere focar em "Tarefas de Alta Prioridade" nas próximas 4 horas.</p>
+                                </div>
                             </div>
-                        ) : (
-                            <>
-                                {currentUserData?.plan === 'PREMIUM' && (
-                                    <div style={{background:'var(--coral)',color:'var(--white)',borderRadius:'20px',padding:'24px',marginBottom:'32px',display:'flex',gap:'20px',alignItems:'center',boxShadow:'0 12px 32px rgba(232,80,58,0.15)'}}>
-                                        <div style={{fontSize:'40px'}}>✨</div>
-                                        <div>
-                                            <h3 style={{fontSize:'20px',marginBottom:'4px',fontWeight:'800',fontFamily:"'Fraunces',serif"}}>Dashboard Premium & Equipe</h3>
-                                            <p style={{fontSize:'14px',opacity:0.9,margin:0,lineHeight:'1.4'}}>Sua taxa de produtividade desta semana está <b>15% superior</b> à média dos seus colaboradores de projetos. A inteligência preditiva sugere focar em "Tarefas de Alta Prioridade" nas próximas 4 horas.</p>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="stats-row">
+                        )}
+                        <div className="stats-row">
                             <div className="stat-card">
                                 <div className="stat-card-label">Total de tarefas</div>
                                 <div className="stat-card-num">{tasks.length}</div>
@@ -1597,8 +1941,9 @@ export default function Home() {
                                 <div className="stat-card-trend">taxa de conclusão</div>
                             </div>
                         </div>
+
                         <div className="section-header" style={{marginTop:'8px'}}><h2>Distribuição por prioridade</h2></div>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'24px'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'32px'}}>
                             {([{label:'Alta',color:'var(--coral)',key:'high'},{label:'Média',color:'var(--amber)',key:'medium'},{label:'Baixa',color:'var(--green)',key:'low'}] as {label:string,color:string,key:string}[]).map(({label,color,key}) => (
                                 <div key={label} style={{background:'var(--cream)',borderRadius:'16px',padding:'20px',textAlign:'center'}}>
                                     <div style={{fontSize:'28px',fontWeight:'700',color,fontFamily:"'Fraunces',serif"}}>{tasks.filter(t=>t.priority===key).length}</div>
@@ -1609,6 +1954,112 @@ export default function Home() {
                                 </div>
                             ))}
                         </div>
+
+                        {/* ---- TIMELINE VISUAL ---- */}
+                        <div className="section-header">
+                            <h2>Cronograma de Hoje (Timeline)</h2>
+                            <div style={{fontSize:'12px', color:'var(--ink-mid)'}}>Visualização de blocos de tempo</div>
+                        </div>
+                        <div style={{background:'var(--white)', borderRadius:'20px', border:'1.5px solid var(--cream-dark)', padding:'24px', marginBottom:'32px', overflowX:'auto'}}>
+                            <div style={{minWidth:'600px', position:'relative', height:'220px', paddingTop:'30px'}}>
+                                {/* Hour markers */}
+                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px', position:'relative'}}>
+                                    {[0,4,8,12,16,20,24].map(h => (
+                                        <div key={h} style={{fontSize:'10px', fontWeight:'700', color:'var(--ink-faint)', width:'20px', textAlign:'center'}}>
+                                            {String(h).padStart(2,'0')}h
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{height:'120px', background:'var(--cream)', borderRadius:'12px', position:'relative', border:'1px solid var(--cream-dark)'}}>
+                                    {/* Grid lines */}
+                                    {[4,8,12,16,20].map(h => (
+                                        <div key={h} style={{position:'absolute', left:`${(h/24)*100}%`, top:0, bottom:0, width:'1px', background:'var(--cream-dark)', opacity:0.5}}></div>
+                                    ))}
+
+                                    {/* Task Blocks */}
+                                    {tasks.filter(t => t.date && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0] && t.startTime).map(t => {
+                                        const [h, m] = t.startTime.split(':').map(Number);
+                                        const startPct = ((h + m/60) / 24) * 100;
+                                        const durationH = (t.duration || 60) / 60;
+                                        const widthPct = (durationH / 24) * 100;
+                                        
+                                        return (
+                                            <div key={t.id} style={{
+                                                position:'absolute',
+                                                left:`${startPct}%`,
+                                                width:`${widthPct}%`,
+                                                top:'20px',
+                                                height:'40px',
+                                                background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)',
+                                                borderRadius:'8px',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                                padding:'4px 8px',
+                                                color:'white',
+                                                fontSize:'11px',
+                                                fontWeight:'600',
+                                                overflow:'hidden',
+                                                whiteSpace:'nowrap',
+                                                textOverflow:'ellipsis',
+                                                zIndex:10,
+                                                cursor:'pointer'
+                                            }} onClick={() => openTaskModal({ taskToEdit: t })}>
+                                                {t.title}
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Routine Blocks */}
+                                    {routines.map(r => {
+                                        if(!r.timeSlot || !r.timeSlot.includes('até')) return null;
+                                        const [startStr, endStr] = r.timeSlot.split(' até ');
+                                        const [sh, sm] = startStr.split(':').map(Number);
+                                        const [eh, em] = endStr.split(':').map(Number);
+                                        const startPct = ((sh + (sm||0)/60) / 24) * 100;
+                                        const endPct = ((eh + (em||0)/60) / 24) * 100;
+                                        const widthPct = endPct - startPct;
+
+                                        return (
+                                            <div key={r.id} style={{
+                                                position:'absolute',
+                                                left:`${startPct}%`,
+                                                width:`${widthPct}%`,
+                                                bottom:'20px',
+                                                height:'24px',
+                                                background: `${r.color}33`,
+                                                border:`1px dashed ${r.color}`,
+                                                borderRadius:'6px',
+                                                padding:'2px 6px',
+                                                color: r.color,
+                                                fontSize:'10px',
+                                                fontWeight:'700',
+                                                overflow:'hidden',
+                                                whiteSpace:'nowrap',
+                                                textOverflow:'ellipsis'
+                                            }}>
+                                                {r.name}
+                                            </div>
+                                        );
+                                    })}
+                                    
+                                    {/* Current time marker */}
+                                    {(() => {
+                                        const now = new Date();
+                                        const pct = ((now.getHours() + now.getMinutes()/60) / 24) * 100;
+                                        return (
+                                            <div style={{position:'absolute', left:`${pct}%`, top:'-5px', bottom:'-5px', width:'2px', background:'var(--blue)', zIndex:20}}>
+                                                <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'var(--blue)', position:'absolute', top:'-4px', left:'-3px'}}></div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                <div style={{display:'flex', gap:'16px', marginTop:'16px', fontSize:'11px', color:'var(--ink-light)'}}>
+                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}><div style={{width:'8px', height:'8px', borderRadius:'2px', background:'var(--coral)'}}></div> Tarefas</div>
+                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}><div style={{width:'8px', height:'8px', borderRadius:'2px', background:'var(--blue)'}}></div> Agora</div>
+                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}><div style={{width:'8px', height:'8px', borderRadius:'2px', background:'var(--cream-dark)', border:'1px dashed var(--ink-faint)'}}></div> Rotinas</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="section-header"><h2>Histórico de streaks (Semana Atual)</h2></div>
                         <div style={{background:'var(--cream)',borderRadius:'16px',padding:'20px 24px',marginBottom:'24px'}}>
                             <div style={{display:'flex',gap:'6px',alignItems:'flex-end',height:'60px'}}>
@@ -1675,9 +2126,7 @@ export default function Home() {
                                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)'}}>Nenhuma tarefa pendente ou concluída.</div>
                             )}
                         </div>
-                            </>
-                        )}
-                    </>
+                    </FeatureGate>
                 )}
 
                 {/* ---- MEU PERFIL ---- */}
@@ -2057,6 +2506,29 @@ export default function Home() {
                         <option value="3h+">Mais de 3h</option>
                     </select>
                 </div>
+            </div>
+            <div className="modal-row">
+                <div className="modal-field">
+                    <div className="modal-label">Horário de Início</div>
+                    <input className="modal-input" type="time" value={newTaskStartTime} onChange={e => setNewTaskStartTime(e.target.value)} />
+                </div>
+                <div className="modal-field">
+                    <div className="modal-label">Duração</div>
+                    <select className="modal-select modal-input" value={newTaskDuration} onChange={e => setNewTaskDuration(Number(e.target.value))}>
+                        <option value={15}>15 min</option>
+                        <option value={30}>30 min</option>
+                        <option value={45}>45 min</option>
+                        <option value={60}>1 hora</option>
+                        <option value={120}>2 horas</option>
+                        <option value={180}>3 horas</option>
+                    </select>
+                </div>
+            </div>
+            <div className="modal-field" style={{marginTop:'4px', marginBottom:'12px'}}>
+                <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontSize:'13px', color:'var(--ink-mid)'}}>
+                    <input type="checkbox" checked={newTaskReminder} onChange={e => setNewTaskReminder(e.target.checked)} style={{accentColor:'var(--coral)'}} />
+                    Ativar lembrete automático
+                </label>
             </div>
             <div className="modal-row">
                 <div className="modal-field">

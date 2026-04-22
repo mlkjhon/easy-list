@@ -78,6 +78,10 @@ export async function createTask(data: {
   title: string;
   priority: string;
   time?: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  reminderAt?: number;
   projectId?: string;
   date?: string;
   routineName?: string;
@@ -89,7 +93,7 @@ export async function createTask(data: {
   // Enforce FREE plan limits
   if ((user as any).plan === 'FREE') {
     const count = await prisma.task.count({ where: { userId: user.id } });
-    if (count >= 50) throw new Error("Limite de 50 tarefas atingido. Faça upgrade para o Plano Pro para tarefas ilimitadas!");
+    if (count >= 30) throw new Error("Limite de 30 tarefas atingido. Faça upgrade para o Plano Pro para tarefas ilimitadas!");
   }
 
   const task = await prisma.task.create({
@@ -97,6 +101,10 @@ export async function createTask(data: {
       title: data.title,
       priority: data.priority,
       time: data.time || null,
+      startTime: data.startTime || null,
+      endTime: data.endTime || null,
+      duration: data.duration !== undefined ? data.duration : null,
+      reminderAt: data.reminderAt !== undefined ? data.reminderAt : null,
       userId: user.id,
       projectId: data.projectId || null,
       date: data.date ? new Date(data.date) : null,
@@ -112,6 +120,10 @@ export async function updateTask(id: string, data: {
   title?: string;
   priority?: string;
   time?: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  reminderAt?: number;
   projectId?: string;
   date?: string;
   routineName?: string;
@@ -123,6 +135,10 @@ export async function updateTask(id: string, data: {
   if (data.title !== undefined) updateData.title = data.title;
   if (data.priority !== undefined) updateData.priority = data.priority;
   if (data.time !== undefined) updateData.time = data.time || null;
+  if (data.startTime !== undefined) updateData.startTime = data.startTime || null;
+  if (data.endTime !== undefined) updateData.endTime = data.endTime || null;
+  if (data.duration !== undefined) updateData.duration = data.duration;
+  if (data.reminderAt !== undefined) updateData.reminderAt = data.reminderAt;
   if (data.projectId !== undefined) updateData.projectId = data.projectId || null;
   if (data.date !== undefined) updateData.date = data.date ? new Date(data.date) : null;
   if (data.routineName !== undefined) updateData.routineName = data.routineName || null;
@@ -207,7 +223,7 @@ export async function createProject(data: { name: string; color: string }) {
   // Enforce FREE plan limits
   if ((user as any).plan === 'FREE') {
     const count = await prisma.project.count({ where: { userId: user.id } });
-    if (count >= 2) throw new Error("Limite de 2 projetos atingido. Faça upgrade para o Plano Pro para projetos ilimitados!");
+    if (count >= 3) throw new Error("Limite de 3 projetos atingido. Faça upgrade para o Plano Pro para projetos ilimitados!");
   }
 
   const project = await prisma.project.create({
@@ -518,4 +534,136 @@ export async function createStripePortalSession() {
     console.error(error);
     return { error: "Failed to generate portal session." };
   }
+}
+
+// ========================
+// SHOPPING LISTS
+// ========================
+export async function getShoppingLists() {
+  const user = await getUser();
+  if (!user) return [];
+  return prisma.shoppingList.findMany({
+    where: { userId: user.id },
+    include: { items: true },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function createShoppingList(name: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  // Gating
+  if ((user as any).plan === 'FREE') {
+    const count = await prisma.shoppingList.count({ where: { userId: user.id } });
+    if (count >= 1) throw new Error("Limite de 1 lista atingido no plano Free.");
+  }
+
+  const list = await prisma.shoppingList.create({
+    data: { name, userId: user.id }
+  });
+  revalidatePath("/");
+  return list;
+}
+
+export async function deleteShoppingList(id: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+  await prisma.shoppingList.delete({ where: { id, userId: user.id } });
+  revalidatePath("/");
+}
+
+export async function duplicateShoppingList(id: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+  
+  const original = await prisma.shoppingList.findUnique({
+    where: { id, userId: user.id },
+    include: { items: true }
+  });
+  if (!original) throw new Error("Lista não encontrada");
+
+  const newList = await prisma.shoppingList.create({
+    data: {
+      name: `${original.name} (Cópia)`,
+      userId: user.id,
+      items: {
+        create: original.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          category: item.category,
+          estimatedPrice: item.estimatedPrice,
+          isBought: false
+        }))
+      }
+    }
+  });
+  revalidatePath("/");
+  return newList;
+}
+
+// ========================
+// SHOPPING ITEMS
+// ========================
+export async function createShoppingItem(listId: string, data: {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  category?: string;
+  estimatedPrice?: number;
+}) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+  
+  const item = await prisma.shoppingItem.create({
+    data: {
+      ...data,
+      listId
+    }
+  });
+  revalidatePath("/");
+  return item;
+}
+
+export async function toggleShoppingItem(id: string, isBought: boolean) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+  const item = await prisma.shoppingItem.update({
+    where: { id },
+    data: { isBought }
+  });
+  revalidatePath("/");
+  return item;
+}
+
+export async function deleteShoppingItem(id: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+  await prisma.shoppingItem.delete({ where: { id } });
+  revalidatePath("/");
+}
+
+export async function clearBoughtShoppingItems(listId: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+  await prisma.shoppingItem.deleteMany({
+    where: { listId, isBought: true }
+  });
+  revalidatePath("/");
+}
+
+// ========================
+// SUBSCRIPTIONS (Simulated)
+// ========================
+export async function activatePlan(plan: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { plan: plan as any }
+  });
+
+  return { success: true };
 }
