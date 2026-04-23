@@ -1854,7 +1854,7 @@ export default function Home() {
                                                         )}
                                                     </div>
                                                 ))}
-                                                {isOwner && <button onClick={async () => { if(window.confirm('Excluir esta equipe permanentemente?')) { await deleteTeam(selectedTeamId!); setSelectedTeamId(null); setTeamDetails(null); const tms = await getTeams(); setTeams(tms); }}} style={{marginTop:'16px', background:'rgba(232,80,58,0.1)', color:'var(--coral)', border:'1.5px solid rgba(232,80,58,0.2)', borderRadius:'12px', padding:'10px', fontSize:'13px', fontWeight:'600', cursor:'pointer', width:'100%'}}>Excluir Equipe</button>}
+                                                {isOwner && <button onClick={async () => { await deleteTeam(selectedTeamId!); setSelectedTeamId(null); setTeamDetails(null); const tms = await getTeams(); setTeams(tms); setSuccessToast('Equipe excluida.'); setTimeout(()=>setSuccessToast(''),3000); }} style={{marginTop:'16px', background:'rgba(232,80,58,0.1)', color:'var(--coral)', border:'1.5px solid rgba(232,80,58,0.2)', borderRadius:'12px', padding:'10px', fontSize:'13px', fontWeight:'600', cursor:'pointer', width:'100%'}}>Excluir Equipe</button>}
                                             </div>
                                         )}
                                         {/* STATS */}
@@ -2993,28 +2993,16 @@ export default function Home() {
             </form>
         </div>
     </div>
-
-    </>
-
     {/* ======== CREATE TEAM MODAL ======== */}
     {isCreateTeamModalOpen && (
         <div className="modal-overlay open" onClick={() => setIsCreateTeamModalOpen(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
                 <div className="modal-title">Criar Nova Equipe</div>
-                <div className="modal-field">
-                    <div className="modal-label">Nome da Equipe</div>
-                    <input className="modal-input" placeholder="Ex: Equipe de Vendas..." value={newTeamName} onChange={e => setNewTeamName(e.target.value)}/>
-                </div>
-                <div className="modal-field">
-                    <div className="modal-label">Descricao (opcional)</div>
-                    <input className="modal-input" placeholder="Descreva o objetivo da equipe..." value={newTeamDescription} onChange={e => setNewTeamDescription(e.target.value)}/>
-                </div>
+                <div className="modal-field"><div className="modal-label">Nome da Equipe</div><input className="modal-input" placeholder="Ex: Equipe de Vendas..." value={newTeamName} onChange={e => setNewTeamName(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Descricao</div><input className="modal-input" placeholder="Objetivo da equipe..." value={newTeamDescription} onChange={e => setNewTeamDescription(e.target.value)}/></div>
                 <div className="modal-actions">
                     <button className="modal-cancel" onClick={() => setIsCreateTeamModalOpen(false)}>Cancelar</button>
-                    <button className="modal-save" onClick={async () => {
-                        if (!newTeamName.trim()) return;
-                        try { await createTeam(newTeamName.trim(), newTeamDescription.trim()); setNewTeamName(''); setNewTeamDescription(''); setIsCreateTeamModalOpen(false); const tms = await getTeams(); setTeams(tms); setSuccessToast('Equipe criada!'); setTimeout(()=>setSuccessToast(''),3000); } catch(e:any) { setSuccessToast(e.message); setTimeout(()=>setSuccessToast(''),4000); }
-                    }}>Criar Equipe</button>
+                    <button className="modal-save" onClick={async () => { if (!newTeamName.trim()) return; try { await createTeam(newTeamName.trim(), newTeamDescription.trim()); setNewTeamName(''); setNewTeamDescription(''); setIsCreateTeamModalOpen(false); const tms = await getTeams(); setTeams(tms); setSuccessToast('Equipe criada!'); setTimeout(()=>setSuccessToast(''),3000); } catch(e:any) { setSuccessToast(e.message); setTimeout(()=>setSuccessToast(''),4000); } }}>Criar Equipe</button>
                 </div>
             </div>
         </div>
@@ -3036,7 +3024,7 @@ export default function Home() {
         <div className="modal-overlay open" onClick={() => setIsAssignTaskModalOpen(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
                 <div className="modal-title">Atribuir Tarefa</div>
-                <div className="modal-field"><div className="modal-label">Titulo</div><input className="modal-input" placeholder="Descricao da tarefa..." value={assignTaskTitle} onChange={e => setAssignTaskTitle(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Titulo</div><input className="modal-input" placeholder="Descricao..." value={assignTaskTitle} onChange={e => setAssignTaskTitle(e.target.value)}/></div>
                 <div className="modal-field"><div className="modal-label">Para</div><select className="modal-input" value={assignToMemberId} onChange={e => setAssignToMemberId(e.target.value)}><option value="">Selecione...</option>{(teamDetails.members||[]).filter((m:any)=>m.userId!==currentUserData?.id).map((m:any)=><option key={m.id} value={m.userId}>{m.user.name}</option>)}</select></div>
                 <div className="modal-field"><div className="modal-label">Prioridade</div><select className="modal-input" value={assignTaskPriority} onChange={e => setAssignTaskPriority(e.target.value)}><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baixa</option></select></div>
                 <div className="modal-field"><div className="modal-label">Data (opcional)</div><input className="modal-input" type="date" value={assignTaskDate} onChange={e => setAssignTaskDate(e.target.value)}/></div>
