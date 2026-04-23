@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -690,3 +690,71 @@ export async function createStripePortalSession() {
     return { error: "Failed to generate portal session." };
   }
 }
+
+export async function getTeams() {
+  const user = await getUser();
+  if (!user) return [];
+  try {
+    const teams = await prisma.team.findMany({
+      where: {
+        members: { some: { userId: user.id } }
+      },
+      include: {
+        members: { include: { user: { select: { id:true, name:true, email:true, image:true } } } }
+      }
+    });
+    return teams;
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function createTeam(name: string, description: string) {
+  const user = await getUser();
+  if (!user) throw new Error('Unauthorized');
+  
+  const team = await prisma.team.create({
+    data: {
+      name,
+      description,
+      color: '#3D7A5E',
+      members: {
+        create: {
+          userId: user.id,
+          role: 'ADMIN'
+        }
+      }
+    }
+  });
+  revalidatePath('/');
+  return { success: true, teamId: team.id };
+}
+
+export async function getTeamDetails(teamId: string) {
+  const user = await getUser();
+  if (!user) return null;
+  const team = await prisma.team.findFirst({
+    where: { id: teamId, members: { some: { userId: user.id } } },
+    include: {
+      members: { include: { user: { select: { id:true, name:true, email:true, image:true } } } },
+      tasks: { orderBy: { createdAt: 'desc' } },
+      messages: { orderBy: { createdAt: 'asc' }, include: { user: { select: { id:true, name:true, image:true } } } }
+    }
+  });
+  return team;
+}
+
+export async function sendTeamMessage(teamId: string, content: string) {
+  const user = await getUser();
+  if (!user) throw new Error('Unauthorized');
+  await prisma.teamMessage.create({
+    data: {
+      content,
+      teamId,
+      userId: user.id
+    }
+  });
+  revalidatePath('/');
+  return { success: true };
+}
+

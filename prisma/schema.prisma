@@ -55,6 +55,10 @@ model User {
   sharedProjects Project[] @relation("ProjectCollaborators")
   shoppingLists ShoppingList[]
 
+  // Teams
+  teamMembers   TeamMember[]
+  teamMessages  TeamMessage[]
+
   // Admin & Billing
   role             String    @default("USER") // USER, ADMIN
   status           String    @default("ACTIVE") // ACTIVE, SUSPENDED, BLOCKED
@@ -103,6 +107,8 @@ model Task {
   routineName String?
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  teamId      String?
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
@@ -129,4 +135,40 @@ model ShoppingItem {
   listId         String
   list           ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#3D7A5E")
+  createdAt   DateTime @default(now())
+  
+  members     TeamMember[]
+  messages    TeamMessage[]
+  tasks       Task[]
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  teamId      String
+  userId      String
+  role        String   @default("MEMBER") // ADMIN, MEMBER
+  joinedAt    DateTime @default(now())
+  
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model TeamMessage {
+  id          String   @id @default(cuid())
+  content     String
+  teamId      String
+  userId      String
+  createdAt   DateTime @default(now())
+  
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

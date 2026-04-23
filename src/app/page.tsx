@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signIn, signOut } from "next-auth/react";
 import * as Icons from "lucide-react";
 import { type Lang, getLangFromBrowser, t } from '@/lib/translations';
 import {
   getTasks, createTask, updateTask, toggleTask, rescheduleTask, deleteTask, registerUser,
-  getProjects, createProject, deleteProject,
+  getProjects, createProject, deleteProject, getTeams, createTeam, getTeamDetails, sendTeamMessage,
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
   getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject,
@@ -56,6 +56,7 @@ export default function Home() {
 
   // Projects
   const [projects, setProjects] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectColor, setNewProjectColor] = useState("#E8503A");
@@ -132,12 +133,28 @@ export default function Home() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [newItemQuantity, setNewItemQuantity] = useState("1");
+  const [shareProjectId, setShareProjectId] = useState<string|null>(null);
+  const [shareEmailInput, setShareEmailInput] = useState('');
 
   // Pricing billing toggle
   const [billingAnnual, setBillingAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number|null>(null);
 
   const { data: session, status } = useSession();
+
+  if (status === "loading") {
+    return (
+      <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--cream)', color:'var(--ink)'}}>
+        <style>{`
+          @keyframes spin { 100% { transform: rotate(360deg); } }
+          .animate-spin { animation: spin 1s linear infinite; }
+        `}</style>
+        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px'}} />
+        <h2 style={{fontSize:'18px', fontWeight:'600'}}>Acessando sua conta...</h2>
+      </div>
+    );
+  }
+
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -149,7 +166,8 @@ export default function Home() {
         }
         setCurrentUserData(data);
 
-        const [t, p, r, sl] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists()]);
+        const [t, p, r, sl, tms] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists(), getTeams()]);
+        setTeams(tms);
         setTasks(t);
         setProjects(p);
         setRoutines(r);
@@ -459,7 +477,7 @@ export default function Home() {
       {successToast && (
         <div style={{
           position:'fixed',top:'24px',left:'50%',transform:'translateX(-50%)',zIndex:9999,
-          background: successToast.startsWith('🎉') ? '#3D7A5E' : 'var(--ink)',
+          background: (successToast.toLowerCase().includes('erro') || successToast.toLowerCase().includes('restrito')) ? 'var(--coral)' : '#3D7A5E',
           color:'white',padding:'14px 28px',borderRadius:'100px',fontSize:'14px',
           fontWeight:'600',boxShadow:'0 8px 32px rgba(0,0,0,0.18)',display:'flex',
           alignItems:'center',gap:'10px',whiteSpace:'nowrap'
@@ -1164,6 +1182,18 @@ export default function Home() {
                         <Icons.Clock size={18} className="sidebar-item-icon" />
                         {t('routines', lang)}
                     </div>
+                    <div className={`sidebar-item ${activeTab === 'Equipes' ? 'active' : ''}`} onClick={() => {
+                        if (currentUserData?.plan === 'FREE') {
+                            setSuccessToast('Acesso restrito. Equipes exigem o Plano Pro ou Premium.');
+                            setTimeout(() => setSuccessToast(''), 4000);
+                            return;
+                        }
+                        setActiveTab('Equipes');
+                    }}>
+                        <Icons.Users size={18} className="sidebar-item-icon" />
+                        Equipes
+                        {currentUserData?.plan === 'FREE' && <Icons.Lock size={12} color="var(--ink-light)" style={{marginLeft:'auto'}} />}
+                    </div>
                     <div className={`sidebar-item ${activeTab === 'Concluídas' ? 'active' : ''}`} onClick={() => setActiveTab('Concluídas')}>
                         <Icons.CheckCircle size={18} className="sidebar-item-icon" />
                         {t('completed', lang)}
@@ -1491,17 +1521,7 @@ export default function Home() {
                                 <button onClick={async () => {
                                     if (currentUserData?.plan === 'FREE') {
                                         setSuccessToast('Plano FREE não possui compartilhamento avançado. Faça upgrade!');
-                                        return;
-                                    }
-                                    const email = window.prompt("Digite o email do colega de trabalho:");
-                                    if (!email) return;
-                                    try {
-                                        const res = await inviteUserToProject(activeTab.replace('proj-',''), email);
-                                        if (res.success) {
-                                            setSuccessToast('Usuário adicionado com sucesso!');
-                                            const p = await getProjects();
-                                            setProjects(p);
-                                        }
+                                    setShareProjectId(activeTab.replace('proj-',''));
                                     } catch (e: any) {
                                         setSuccessToast(`Erro: ${e.message}`);
                                     }
@@ -1651,6 +1671,50 @@ export default function Home() {
                 )}
 
                 {/* ---- DASHBOARD ---- */}
+                {/* ---- EQUIPES ---- */}
+                {activeTab === 'Equipes' && (
+                    <div style={{display:'flex', gap:'24px', height:'calc(100vh - 120px)'}}>
+                        <div style={{flex:1, background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 12px 32px rgba(0,0,0,0.02)'}}>
+                            <div style={{padding:'20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <div>
+                                    <h2 style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', margin:0}}>Painel da Equipe</h2>
+                                    <p style={{fontSize:'13px', color:'var(--ink-light)', margin:'4px 0 0 0'}}>Selecione uma equipe para interagir.</p>
+                                </div>
+                                <button onClick={() => setSuccessToast('Criao de equipe em breve!')} style={{background:'var(--ink)', color:'white', border:'none', borderRadius:'12px', padding:'10px 16px', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}><Icons.Plus size={16} style={{display:'inline', marginBottom:'-3px', marginRight:'6px'}}/>Nova Equipe</button>
+                            </div>
+                            <div style={{flex:1, padding:'20px', overflowY:'auto'}}>
+                                {teams.length === 0 ? (
+                                    <div style={{textAlign:'center', padding:'60px 20px', color:'var(--ink-faint)'}}>
+                                        <Icons.Users size={48} strokeWidth={1} style={{marginBottom:'16px', color:'var(--ink-light)'}} />
+                                        <p style={{fontSize:'15px', color:'var(--ink-mid)'}}>Voc ainda no faz parte de nenhuma equipe.</p>
+                                    </div>
+                                ) : (
+                                    <div style={{display:'grid', gap:'16px'}}>
+                                        {teams.map(team => (
+                                            <div key={team.id} style={{padding:'20px', borderRadius:'16px', border:'1px solid var(--cream-dark)', cursor:'pointer', transition:'border-color 0.2s'}} onMouseEnter={e=>e.currentTarget.style.borderColor='var(--coral)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--cream-dark)'}>
+                                                <div style={{fontSize:'16px', fontWeight:'600', color:'var(--ink)', marginBottom:'8px'}}>{team.name}</div>
+                                                <div style={{fontSize:'13px', color:'var(--ink-light)', marginBottom:'16px'}}>{team.description || 'Sem descrio'}</div>
+                                                <div style={{display:'flex'}}>
+                                                    {team.members.map((m:any) => (
+                                                        <div key={m.id} title={m.user.name} style={{width:'32px', height:'32px', borderRadius:'16px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', marginLeft:'-10px', border:'2px solid white', fontWeight:'700'}}>{m.user.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div style={{width:'380px', background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', boxShadow:'0 12px 32px rgba(0,0,0,0.02)'}}>
+                            <div style={{padding:'20px', borderBottom:'1px solid var(--cream-dark)'}}>
+                                <h3 style={{fontSize:'16px', fontWeight:'700', color:'var(--ink)', margin:0}}>Mural de Avisos</h3>
+                            </div>
+                            <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--ink-faint)', fontSize:'13px', padding:'20px', textAlign:'center'}}>
+                                Selecione uma equipe para ver o chat e as tarefas do time.
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {activeTab === 'Dashboard' && (
                     <>
                         {currentUserData?.plan === 'FREE' ? (
@@ -1697,6 +1761,38 @@ export default function Home() {
                         </div>
                         <div className="section-header" style={{marginTop:'8px'}}><h2>Distribuição por prioridade</h2></div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'24px'}}>
+                        {teams.length > 0 && (
+                            <div style={{marginTop:'32px'}}>
+                                <div className="section-header"><h2>Performance da Equipe</h2></div>
+                                <div style={{background:'var(--white)', borderRadius:'16px', border:'1px solid var(--cream-dark)', overflow:'hidden'}}>
+                                    {teams.map(team => (
+                                        <div key={team.id} style={{padding:'20px', borderBottom:'1px solid var(--cream-dark)'}}>
+                                            <h4 style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)', margin:'0 0 16px 0', display:'flex', alignItems:'center', gap:'8px'}}><Icons.Users size={16} color="var(--coral)"/> {team.name}</h4>
+                                            <div style={{display:'grid', gap:'12px'}}>
+                                                {team.members.map((m:any) => {
+                                                    const memberTasks = tasks.filter(t => t.userId === m.userId && (t.projectId || t.teamId === team.id));
+                                                    const doneMember = memberTasks.filter(t => t.isDone).length;
+                                                    const pctMember = memberTasks.length > 0 ? Math.round((doneMember / memberTasks.length) * 100) : 0;
+                                                    return (
+                                                        <div key={m.id} style={{display:'flex', alignItems:'center', gap:'16px', padding:'12px', background:'var(--cream)', borderRadius:'12px'}}>
+                                                            {m.user.image ? <img src={m.user.image} style={{width:'40px', height:'40px', borderRadius:'20px'}} /> : <div style={{width:'40px', height:'40px', borderRadius:'20px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', fontSize:'14px'}}>{m.user.name?.charAt(0)?.toUpperCase() || '?'}</div>}
+                                                            <div style={{flex:1}}>
+                                                                <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{m.user.name} <span style={{fontSize:'11px', fontWeight:'500', background:'var(--white)', padding:'2px 6px', borderRadius:'8px', color:'var(--ink-light)', marginLeft:'8px'}}>{m.role === 'ADMIN' ? 'Lder' : 'Membro'}</span></div>
+                                                                <div style={{fontSize:'12px', color:'var(--ink-mid)', marginTop:'4px'}}>{doneMember} de {memberTasks.length} tarefas concludas</div>
+                                                                <div style={{height:'6px', background:'var(--white)', borderRadius:'3px', marginTop:'6px', overflow:'hidden'}}>
+                                                                    <div style={{height:'100%', width:${pctMember}%, background: pctMember === 100 ? 'var(--green)' : 'var(--blue)', transition:'width 0.3s'}}></div>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{fontSize:'20px', fontWeight:'700', color: pctMember === 100 ? 'var(--green)' : 'var(--ink)'}}>{pctMember}%</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                             {([{label:'Alta',color:'var(--coral)',key:'high'},{label:'Média',color:'var(--amber)',key:'medium'},{label:'Baixa',color:'var(--green)',key:'low'}] as {label:string,color:string,key:string}[]).map(({label,color,key}) => (
                                 <div key={label} style={{background:'var(--cream)',borderRadius:'16px',padding:'20px',textAlign:'center'}}>
                                     <div style={{fontSize:'28px',fontWeight:'700',color,fontFamily:"'Fraunces',serif"}}>{tasks.filter(t=>t.priority===key).length}</div>
@@ -2096,12 +2192,19 @@ export default function Home() {
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Relatórios semanais por e-mail</li>
                                 </ul>
                                 <button onClick={async () => {
-                                    // Simulation of payment
-                                    const res = await adminUpdateUserPlan(currentUserData.id, "PRO");
-                                    setSuccessToast(`Plano Pro (${billingAnnual ? 'Anual' : 'Mensal'}) ativado com sucesso! Você já pode aproveitar o Dashboard.`);
-                                    setTimeout(() => setSuccessToast(''), 4000);
-                                    window.history.replaceState({}, '', '/?checkout=success');
-                                    window.location.reload();
+                                    const res = await fetch('/api/checkout', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ plan: 'PRO', billingAnnual })
+                                    });
+                                    if(res.ok) {
+                                        const { url } = await res.json();
+                                        window.location.href = url;
+                                    } else {
+                                        const errText = await res.text();
+                                        setSuccessToast('Erro Stripe: ' + errText);
+                                        setTimeout(() => setSuccessToast(''), 4000);
+                                    }
                                 }} style={{background:'var(--cream)', color:'var(--ink)', border:'1px solid var(--cream-dark)', borderRadius:'12px', padding:'14px', fontSize:'14px', fontWeight:'600', cursor:'pointer', width:'100%', transition:'background 0.2s', textAlign:'center'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--cream-dark)')} onMouseLeave={e=>(e.currentTarget.style.background='var(--cream)')}>Assinar Plano Pro</button>
                             </div>
 
@@ -2547,6 +2650,57 @@ export default function Home() {
     )}
 
     {/* ======== NEW ROUTINE MODAL ======== */}
+    {/* ======== SHARE PROJECT MODAL ======== */}
+    {shareProjectId && (
+        <div className="modal-overlay open" onClick={() => setShareProjectId(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Compartilhar Projeto</div>
+                <div className="modal-field">
+                    <div className="modal-label">Convidar por E-mail</div>
+                    <div style={{display:'flex', gap:'8px'}}>
+                        <input className="modal-input" type="email" placeholder="Ex: colega@empresa.com" value={shareEmailInput} onChange={e => setShareEmailInput(e.target.value)} style={{flex:1}} />
+                        <button onClick={async () => {
+                            if (!shareEmailInput.trim()) return;
+                            if (currentUserData?.plan === 'FREE') {
+                                setSuccessToast('Acesso restrito. Compartilhamento avanado exige upgrade.');
+                                setTimeout(() => setSuccessToast(''), 4000);
+                                return;
+                            }
+                            try {
+                                const res = await inviteUserToProject(shareProjectId, shareEmailInput);
+                                if (res.success) {
+                                    setSuccessToast('Usurio adicionado com sucesso!');
+                                    setShareEmailInput('');
+                                    const p = await getProjects();
+                                    setProjects(p);
+                                }
+                            } catch (e: any) {
+                                setSuccessToast("Erro: ${e.message}");
+                                setTimeout(() => setSuccessToast(''), 4000);
+                            }
+                        }} style={{background:'var(--ink)', color:'white', border:'none', borderRadius:'8px', padding:'0 16px', fontWeight:'600', cursor:'pointer'}}>Enviar</button>
+                    </div>
+                </div>
+                <div className="modal-field" style={{marginTop:'24px'}}>
+                    <div className="modal-label">Membros Atuais</div>
+                    <div style={{display:'flex', flexDirection:'column', gap:'12px', marginTop:'12px'}}>
+                        {projects.find((p:any)=>p.id===shareProjectId)?.collaborators?.length > 0 ? projects.find((p:any)=>p.id===shareProjectId)?.collaborators?.map((c:any) => (
+                            <div key={c.id} style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                {c.image ? <img src={c.image} alt={c.name} style={{width:'32px', height:'32px', borderRadius:'16px', objectFit:'cover'}} /> : <div style={{width:'32px', height:'32px', borderRadius:'16px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:'700'}}>{c.name?.charAt(0)?.toUpperCase() || '?'}</div>}
+                                <div style={{display:'flex', flexDirection:'column'}}>
+                                    <span style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{c.name || 'Usurio'}</span>
+                                    <span style={{fontSize:'12px', color:'var(--ink-light)'}}>{c.email}</span>
+                                </div>
+                            </div>
+                        )) : <div style={{fontSize:'14px', color:'var(--ink-light)'}}>Apenas voc tem acesso a este projeto.</div>}
+                    </div>
+                </div>
+                <div className="modal-actions" style={{marginTop:'32px'}}>
+                    <button className="modal-cancel" onClick={() => { setShareProjectId(null); setShareEmailInput(''); }} style={{width:'100%'}}>Fechar</button>
+                </div>
+            </div>
+        </div>
+    )}
     {isRoutineModalOpen && (
         <div className="modal-overlay open" onClick={() => setIsRoutineModalOpen(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
@@ -2650,4 +2804,8 @@ export default function Home() {
     </>
   );
 }
+
+
+
+
 
