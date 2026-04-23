@@ -2279,8 +2279,9 @@ export default function Home() {
                                             <button id="addItemBtn"
                                                 style={{padding:'10px 16px',background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:'700',cursor:'pointer',alignSelf:'end',whiteSpace:'nowrap'}}
                                                 onClick={async () => {
-                                                    if (!newItemName.trim()) return;
-                                                    await createShoppingItem(selectedListId, {
+                                                    if (!newItemName.trim() || !selectedListId) return;
+                                                    await createShoppingItem({
+                                                        listId: selectedListId,
                                                         name: newItemName.trim(),
                                                         quantity: parseFloat(newItemQuantity) || 1,
                                                         unit: newItemUnit,
