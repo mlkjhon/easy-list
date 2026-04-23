@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signIn, signOut } from "next-auth/react";
 import * as Icons from "lucide-react";
@@ -1778,7 +1778,7 @@ export default function Home() {
                                                                 <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{m.user.name} <span style={{fontSize:'11px', fontWeight:'500', background:'var(--white)', padding:'2px 6px', borderRadius:'8px', color:'var(--ink-light)', marginLeft:'8px'}}>{m.role === 'ADMIN' ? 'Lder' : 'Membro'}</span></div>
                                                                 <div style={{fontSize:'12px', color:'var(--ink-mid)', marginTop:'4px'}}>{doneMember} de {memberTasks.length} tarefas concludas</div>
                                                                 <div style={{height:'6px', background:'var(--white)', borderRadius:'3px', marginTop:'6px', overflow:'hidden'}}>
-                                                                    <div style={{height:'100%', width:${pctMember}%, background: pctMember === 100 ? 'var(--green)' : 'var(--blue)', transition:'width 0.3s'}}></div>
+                                                                    <div style={{height:'100%', width:`${pctMember}%`, background: pctMember === 100 ? 'var(--green)' : 'var(--blue)', transition:'width 0.3s'}}></div>
                                                                 </div>
                                                             </div>
                                                             <div style={{fontSize:'20px', fontWeight:'700', color: pctMember === 100 ? 'var(--green)' : 'var(--ink)'}}>{pctMember}%</div>
