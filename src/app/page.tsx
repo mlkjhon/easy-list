@@ -1520,10 +1520,10 @@ export default function Home() {
                                 })()}
                                 <button onClick={async () => {
                                     if (currentUserData?.plan === 'FREE') {
-                                        setSuccessToast('Plano FREE não possui compartilhamento avançado. Faça upgrade!');
+                                        setSuccessToast('Plano FREE no possui compartilhamento avanado. Faa upgrade!');
+                                        return;
+                                    }
                                     setShareProjectId(activeTab.replace('proj-',''));
-                                    } catch (e: any) {
-                                        setSuccessToast(`Erro: ${e.message}`);
                                     }
                                 }} style={{background:'white', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', borderRadius:'10px', padding:'6px 14px', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>+ Compartilhar</button>
                                 <button style={{cursor:'pointer', background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'7px 14px', fontSize:'13px', fontWeight:'600'}} onClick={() => openTaskModal({ projectId: activeTab.replace('proj-','') })}>Criar Tarefa</button>
