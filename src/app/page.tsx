@@ -43,6 +43,14 @@ export default function Home() {
   const [presetImportant, setPresetImportant] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string|null>(null);
   
+  // AI Chat State
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', content:string}[]>([
+    { role: 'ai', content: 'Olá! Sou seu Assistente Easy List. O que você gostaria de analisar hoje?' }
+  ]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
+
   // UI Globals
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -287,6 +295,27 @@ export default function Home() {
 
   const refreshStats = () =>
     getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
+
+  const handleSendAiMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    const userMsg = chatInput.trim();
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatInput("");
+    setIsAiTyping(true);
+
+    // Mock AI Reply
+    setTimeout(() => {
+      setIsAiTyping(false);
+      let aiResponse = `Este é um protótipo visual! Em breve me conectarei à API do Gemini para respostas reais. Pude ver que você tem ${tasks.length} tarefas pendentes. Posso te ajudar a organizá-las?`;
+      if (userMsg.toLowerCase().includes("hoje")) {
+        const todayTasks = tasks.filter(t => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0]);
+        aiResponse = `Você tem ${todayTasks.length} tarefas pendentes para hoje. Que tal focarmos nas de prioridade Alta primeiro?`;
+      }
+      setChatMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
+    }, 1500);
+  };
 
   const handleSaveTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -1262,9 +1291,11 @@ export default function Home() {
                     {activeTab === 'Esta Semana' && (
                         <button className="app-add-btn" onClick={() => openTaskModal({ date: selectedWeekDate || new Date().toISOString().split('T')[0] })}><Icons.Calendar size={16} style={{display:'inline',marginBottom:'-3px'}}/> Dia selecionado</button>
                     )}
+                    {activeTab === 'Rotinas' && (
                         <button className="app-add-btn" onClick={() => setIsRoutineModalOpen(true)}>
                             <Icons.Plus size={16} style={{display:'inline',marginBottom:'-3px'}}/> Nova rotina
                         </button>
+                    )}
                     {activeTab === 'Concluídas' && (
                         <></>
                     )}
@@ -2567,6 +2598,44 @@ export default function Home() {
             </div>
         </div>
     )}
+
+    {/* ======== AI ASSISTANT FAB & PANEL ======== */}
+    {['Meu Dia', 'Caixa de Entrada', 'Esta Semana', 'Lista de Compras', 'Rotinas'].includes(activeTab) && (
+        <button className="ai-fab" onClick={() => setIsAiChatOpen(true)} title="Assistente IA">
+            <Icons.Sparkles size={24} />
+        </button>
+    )}
+
+    <div className={`ai-panel-overlay ${isAiChatOpen ? 'open' : ''}`} onClick={() => setIsAiChatOpen(false)}>
+        <div className="ai-panel" onClick={e => e.stopPropagation()}>
+            <div className="ai-header">
+                <div className="ai-title"><Icons.Sparkles size={20} color="var(--coral)" /> IA Assistente</div>
+                <button onClick={() => setIsAiChatOpen(false)} style={{background:'transparent', border:'none', color:'var(--ink-light)', cursor:'pointer', padding:'4px', borderRadius:'8px'}}><Icons.X size={20} /></button>
+            </div>
+            <div className="ai-chat-area">
+                {chatMessages.map((msg, i) => (
+                    <div key={i} className={`ai-bubble ${msg.role}`}>
+                        {msg.content}
+                    </div>
+                ))}
+                {isAiTyping && (
+                    <div className="ai-bubble ai">
+                        <div className="typing-indicator">
+                            <div className="typing-dot"></div><div className="typing-dot"></div><div className="typing-dot"></div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <form className="ai-input-area" onSubmit={handleSendAiMessage}>
+                <div className="ai-input-wrapper">
+                    <input type="text" className="ai-input" placeholder="Pergunte sobre suas tarefas..." value={chatInput} onChange={e => setChatInput(e.target.value)} />
+                    <button type="submit" className="ai-send-btn" disabled={!chatInput.trim() || isAiTyping}>
+                        <Icons.Send size={14} style={{marginLeft:'2px'}} />
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     </>
   );
