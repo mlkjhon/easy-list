@@ -5,7 +5,8 @@ import * as Icons from "lucide-react";
 import { type Lang, getLangFromBrowser, t } from '@/lib/translations';
 import {
   getTasks, createTask, updateTask, toggleTask, rescheduleTask, deleteTask, registerUser,
-  getProjects, createProject, deleteProject, getTeams, createTeam, getTeamDetails, sendTeamMessage,
+  getProjects, createProject, deleteProject, getTeams, createTeam, deleteTeam, getTeamDetails, sendTeamMessage,
+  inviteToTeam, respondToInvitation, updateMemberRole, removeMember, assignTaskToMember, getTeamStats, cancelInvitation, getMyInvitations,
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
   getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject,
@@ -136,6 +137,27 @@ export default function Home() {
   const [shareProjectId, setShareProjectId] = useState<string|null>(null);
   const [shareEmailInput, setShareEmailInput] = useState('');
 
+  // Teams
+  const [selectedTeamId, setSelectedTeamId] = useState<string|null>(null);
+  const [teamDetails, setTeamDetails] = useState<any>(null);
+  const [teamStats, setTeamStats] = useState<any>(null);
+  const [myInvitations, setMyInvitations] = useState<any[]>([]);
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamDescription, setNewTeamDescription] = useState('');
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('WORKER');
+  const [teamChatInput, setTeamChatInput] = useState('');
+  const [isAssignTaskModalOpen, setIsAssignTaskModalOpen] = useState(false);
+  const [assignToMemberId, setAssignToMemberId] = useState('');
+  const [assignTaskTitle, setAssignTaskTitle] = useState('');
+  const [assignTaskPriority, setAssignTaskPriority] = useState('medium');
+  const [assignTaskDate, setAssignTaskDate] = useState('');
+  const [teamActiveTab, setTeamActiveTab] = useState<'chat'|'tasks'|'members'|'stats'>('chat');
+  const [isInvitationsModalOpen, setIsInvitationsModalOpen] = useState(false);
+  const [isTeamDetailLoading, setIsTeamDetailLoading] = useState(false);
+
   // Pricing billing toggle
   const [billingAnnual, setBillingAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number|null>(null);
@@ -152,8 +174,9 @@ export default function Home() {
         }
         setCurrentUserData(data);
 
-        const [t, p, r, sl, tms] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists(), getTeams()]);
+        const [t, p, r, sl, tms, invs] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists(), getTeams(), getMyInvitations()]);
         setTeams(tms);
+        setMyInvitations(invs || []);
         setTasks(t);
         setProjects(p);
         setRoutines(r);
@@ -452,15 +475,16 @@ export default function Home() {
     );
   };
 
-  if (status === "loading") {
+  if (status === "loading" && activeScreen === "app") {
     return (
       <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--cream)', color:'var(--ink)'}}>
         <style>{`
           @keyframes spin { 100% { transform: rotate(360deg); } }
           .animate-spin { animation: spin 1s linear infinite; }
         `}</style>
-        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px'}} />
+        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px', color:'var(--coral)'}} />
         <h2 style={{fontSize:'18px', fontWeight:'600'}}>Acessando sua conta...</h2>
+        <p style={{fontSize:'13px', color:'var(--ink-light)', marginTop:'8px'}}>Aguarde um momento</p>
       </div>
     );
   }
@@ -1192,7 +1216,17 @@ export default function Home() {
                         <Icons.Users size={18} className="sidebar-item-icon" />
                         Equipes
                         {currentUserData?.plan === 'FREE' && <Icons.Lock size={12} color="var(--ink-light)" style={{marginLeft:'auto'}} />}
+                        {currentUserData?.plan !== 'FREE' && myInvitations.length > 0 && (
+                            <span style={{marginLeft:'auto', background:'var(--coral)', color:'white', fontSize:'10px', fontWeight:'700', borderRadius:'10px', padding:'1px 6px', minWidth:'16px', textAlign:'center'}}>{myInvitations.length}</span>
+                        )}
                     </div>
+                    {/* Invitations bell — shown when not on Equipes tab */}
+                    {currentUserData?.plan !== 'FREE' && myInvitations.length > 0 && activeTab !== 'Equipes' && (
+                        <div style={{margin:'4px 12px', padding:'10px 14px', borderRadius:'12px', background:'rgba(232,80,58,0.06)', border:'1.5px solid rgba(232,80,58,0.2)', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px'}} onClick={() => setIsInvitationsModalOpen(true)}>
+                            <Icons.Bell size={15} color="var(--coral)" style={{flexShrink:0}}/>
+                            <span style={{fontSize:'12px', fontWeight:'600', color:'var(--coral)'}}>{myInvitations.length} convite{myInvitations.length>1?'s':''} pendente{myInvitations.length>1?'s':''}</span>
+                        </div>
+                    )}
                     <div className={`sidebar-item ${activeTab === 'Concluídas' ? 'active' : ''}`} onClick={() => setActiveTab('Concluídas')}>
                         <Icons.CheckCircle size={18} className="sidebar-item-icon" />
                         {t('completed', lang)}
@@ -1669,49 +1703,211 @@ export default function Home() {
 
                 {/* ---- DASHBOARD ---- */}
                 {/* ---- EQUIPES ---- */}
-                {activeTab === 'Equipes' && (
-                    <div style={{display:'flex', gap:'24px', height:'calc(100vh - 120px)'}}>
-                        <div style={{flex:1, background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 12px 32px rgba(0,0,0,0.02)'}}>
-                            <div style={{padding:'20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                <div>
-                                    <h2 style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', margin:0}}>Painel da Equipe</h2>
-                                    <p style={{fontSize:'13px', color:'var(--ink-light)', margin:'4px 0 0 0'}}>Selecione uma equipe para interagir.</p>
-                                </div>
-                                <button onClick={() => setSuccessToast('Criao de equipe em breve!')} style={{background:'var(--ink)', color:'white', border:'none', borderRadius:'12px', padding:'10px 16px', fontSize:'13px', fontWeight:'600', cursor:'pointer'}}><Icons.Plus size={16} style={{display:'inline', marginBottom:'-3px', marginRight:'6px'}}/>Nova Equipe</button>
+                {activeTab === 'Equipes' && (() => {
+                    const myMembership = selectedTeamId && teamDetails ? teamDetails.members?.find((m:any) => m.userId === currentUserData?.id) : null;
+                    const canInvite = myMembership && ['OWNER','VICE_OWNER'].includes(myMembership.role);
+                    const canAssign = myMembership && ['OWNER','VICE_OWNER','SUPERVISOR'].includes(myMembership.role);
+                    const isOwner = myMembership?.role === 'OWNER';
+                    const ROLE_LABELS: any = { OWNER: 'Anfitrião', VICE_OWNER: 'Vice-Anfitrião', SUPERVISOR: 'Supervisor', WORKER: 'Trabalhador' };
+                    return (
+                    <div style={{display:'flex', gap:'20px', height:'calc(100vh - 120px)'}}>
+                        {/* LEFT: Team list */}
+                        <div style={{width:'280px', background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+                            <div style={{padding:'16px 20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <span style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)'}}>Minhas Equipes</span>
+                                <button onClick={() => setIsCreateTeamModalOpen(true)} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'7px 12px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px'}}><Icons.Plus size={14}/>Criar</button>
                             </div>
-                            <div style={{flex:1, padding:'20px', overflowY:'auto'}}>
+                            <div style={{flex:1, overflowY:'auto', padding:'12px'}}>
                                 {teams.length === 0 ? (
-                                    <div style={{textAlign:'center', padding:'60px 20px', color:'var(--ink-faint)'}}>
-                                        <Icons.Users size={48} strokeWidth={1} style={{marginBottom:'16px', color:'var(--ink-light)'}} />
-                                        <p style={{fontSize:'15px', color:'var(--ink-mid)'}}>Voc ainda no faz parte de nenhuma equipe.</p>
+                                    <div style={{textAlign:'center', padding:'40px 12px', color:'var(--ink-faint)'}}>
+                                        <Icons.Users size={36} strokeWidth={1} style={{marginBottom:'10px', color:'var(--ink-light)'}}/>
+                                        <p style={{fontSize:'13px'}}>Nenhuma equipe ainda.</p>
                                     </div>
-                                ) : (
-                                    <div style={{display:'grid', gap:'16px'}}>
-                                        {teams.map(team => (
-                                            <div key={team.id} style={{padding:'20px', borderRadius:'16px', border:'1px solid var(--cream-dark)', cursor:'pointer', transition:'border-color 0.2s'}} onMouseEnter={e=>e.currentTarget.style.borderColor='var(--coral)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--cream-dark)'}>
-                                                <div style={{fontSize:'16px', fontWeight:'600', color:'var(--ink)', marginBottom:'8px'}}>{team.name}</div>
-                                                <div style={{fontSize:'13px', color:'var(--ink-light)', marginBottom:'16px'}}>{team.description || 'Sem descrio'}</div>
-                                                <div style={{display:'flex'}}>
-                                                    {team.members.map((m:any) => (
-                                                        <div key={m.id} title={m.user.name} style={{width:'32px', height:'32px', borderRadius:'16px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', marginLeft:'-10px', border:'2px solid white', fontWeight:'700'}}>{m.user.name?.charAt(0)?.toUpperCase() || '?'}</div>
-                                                    ))}
+                                ) : teams.map((team:any) => (
+                                    <div key={team.id} onClick={async () => {
+                                        setSelectedTeamId(team.id);
+                                        setTeamActiveTab('chat');
+                                        setIsTeamDetailLoading(true);
+                                        const [det, st] = await Promise.all([getTeamDetails(team.id), getTeamStats(team.id)]);
+                                        setTeamDetails(det);
+                                        setTeamStats(st);
+                                        setIsTeamDetailLoading(false);
+                                    }} style={{padding:'14px', borderRadius:'14px', border:`2px solid ${selectedTeamId===team.id?'var(--coral)':'var(--cream-dark)'}`, marginBottom:'8px', cursor:'pointer', transition:'all 0.2s', background: selectedTeamId===team.id?'rgba(232,80,58,0.04)':'transparent'}}>
+                                        <div style={{fontWeight:'600', fontSize:'14px', color:'var(--ink)', marginBottom:'4px'}}>{team.name}</div>
+                                        <div style={{fontSize:'12px', color:'var(--ink-light)', display:'flex', alignItems:'center', gap:'4px'}}>
+                                            <Icons.Users size={11}/> {team.members?.length || 0} membros
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* RIGHT: Team detail */}
+                        <div style={{flex:1, background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+                            {!selectedTeamId ? (
+                                <div style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'var(--ink-faint)', gap:'12px'}}>
+                                    <Icons.Users size={48} strokeWidth={1} style={{color:'var(--ink-light)'}}/>
+                                    <p style={{fontSize:'15px', color:'var(--ink-mid)'}}>Selecione uma equipe para começar</p>
+                                </div>
+                            ) : isTeamDetailLoading ? (
+                                <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                    <Icons.Loader2 size={32} style={{animation:'spin 1s linear infinite', color:'var(--coral)'}}/>
+                                </div>
+                            ) : teamDetails ? (
+                                <>
+                                    {/* Header */}
+                                    <div style={{padding:'16px 20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                        <div>
+                                            <h2 style={{fontSize:'17px', fontWeight:'700', color:'var(--ink)', margin:0}}>{teamDetails.name}</h2>
+                                            <p style={{fontSize:'12px', color:'var(--ink-light)', margin:'2px 0 0'}}>{teamDetails.description || 'Sem descrição'} · {teamDetails.members?.length} membros</p>
+                                        </div>
+                                        <div style={{display:'flex', gap:'8px'}}>
+                                            {canInvite && <button onClick={() => setIsInviteModalOpen(true)} style={{background:'var(--cream)', color:'var(--ink)', border:'none', borderRadius:'10px', padding:'8px 14px', fontSize:'13px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px'}}><Icons.UserPlus size={14}/>Convidar</button>}
+                                            {canAssign && <button onClick={() => setIsAssignTaskModalOpen(true)} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'8px 14px', fontSize:'13px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px'}}><Icons.ListPlus size={14}/>Atribuir Tarefa</button>}
+                                        </div>
+                                    </div>
+                                    {/* Inner tabs */}
+                                    <div style={{display:'flex', borderBottom:'1px solid var(--cream-dark)', padding:'0 20px'}}>
+                                        {(['chat','tasks','members','stats'] as const).map(tab => {
+                                            const labels: any = {chat:'Chat', tasks:'Tarefas', members:'Membros', stats:'Estatísticas'};
+                                            return <button key={tab} onClick={() => setTeamActiveTab(tab)} style={{padding:'12px 16px', border:'none', background:'transparent', borderBottom: teamActiveTab===tab?'2px solid var(--coral)':'2px solid transparent', color: teamActiveTab===tab?'var(--coral)':'var(--ink-mid)', fontWeight: teamActiveTab===tab?'700':'500', fontSize:'13px', cursor:'pointer', transition:'all 0.2s'}}>{labels[tab]}</button>
+                                        })}
+                                    </div>
+                                    {/* Tab content */}
+                                    <div style={{flex:1, overflowY:'auto', padding:'20px'}}>
+                                        {/* CHAT */}
+                                        {teamActiveTab === 'chat' && (
+                                            <div style={{display:'flex', flexDirection:'column', height:'100%', gap:'12px'}}>
+                                                <div style={{flex:1, display:'flex', flexDirection:'column', gap:'10px', overflowY:'auto'}}>
+                                                    {(teamDetails.messages || []).length === 0 && <div style={{textAlign:'center', color:'var(--ink-faint)', paddingTop:'40px', fontSize:'13px'}}>Nenhuma mensagem ainda. Seja o primeiro!</div>}
+                                                    {(teamDetails.messages || []).map((msg:any) => {
+                                                        const isMe = msg.userId === currentUserData?.id;
+                                                        return (
+                                                            <div key={msg.id} style={{display:'flex', flexDirection: isMe?'row-reverse':'row', gap:'10px', alignItems:'flex-end'}}>
+                                                                {msg.user.image ? <img src={msg.user.image} style={{width:'32px', height:'32px', borderRadius:'50%', flexShrink:0}}/> : <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'700', flexShrink:0}}>{msg.user.name?.charAt(0)||'?'}</div>}
+                                                                <div style={{maxWidth:'65%'}}>
+                                                                    {!isMe && <div style={{fontSize:'11px', color:'var(--ink-light)', marginBottom:'3px'}}>{msg.user.name}</div>}
+                                                                    <div style={{padding:'10px 14px', borderRadius: isMe?'16px 4px 16px 16px':'4px 16px 16px 16px', background: isMe?'var(--coral)':'var(--cream)', color: isMe?'white':'var(--ink)', fontSize:'14px', lineHeight:'1.4'}}>{msg.content}</div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div style={{display:'flex', gap:'10px', paddingTop:'12px', borderTop:'1px solid var(--cream-dark)'}}>
+                                                    <input value={teamChatInput} onChange={e => setTeamChatInput(e.target.value)} onKeyDown={async e => { if(e.key==='Enter' && teamChatInput.trim()) { await sendTeamMessage(selectedTeamId!, teamChatInput.trim()); setTeamChatInput(''); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }}} placeholder="Escreva uma mensagem..." style={{flex:1, padding:'12px 16px', borderRadius:'12px', border:'1.5px solid var(--cream-dark)', fontSize:'14px', background:'var(--cream)', outline:'none'}}/>
+                                                    <button onClick={async () => { if(!teamChatInput.trim()) return; await sendTeamMessage(selectedTeamId!, teamChatInput.trim()); setTeamChatInput(''); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'12px', padding:'0 18px', cursor:'pointer'}}><Icons.Send size={16}/></button>
                                                 </div>
                                             </div>
-                                        ))}
+                                        )}
+                                        {/* TASKS */}
+                                        {teamActiveTab === 'tasks' && (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                                {(teamDetails.tasks || []).length === 0 && <div style={{textAlign:'center', color:'var(--ink-faint)', paddingTop:'40px', fontSize:'13px'}}>Nenhuma tarefa atribuída ainda.</div>}
+                                                {(teamDetails.tasks || []).map((task:any) => {
+                                                    const assignee = teamDetails.members?.find((m:any) => m.userId === task.assignedToId);
+                                                    return (
+                                                        <div key={task.id} style={{padding:'14px 16px', borderRadius:'14px', border:'1.5px solid var(--cream-dark)', background:'var(--cream)', display:'flex', alignItems:'center', gap:'14px'}}>
+                                                            <div style={{width:'10px', height:'10px', borderRadius:'50%', background: task.priority==='high'?'var(--coral)':task.priority==='medium'?'var(--amber)':'var(--green)', flexShrink:0}}/>
+                                                            <div style={{flex:1}}>
+                                                                <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)', textDecoration: task.isDone?'line-through':'none'}}>{task.title}</div>
+                                                                {assignee && <div style={{fontSize:'12px', color:'var(--ink-light)', marginTop:'3px'}}>Para: {assignee.user.name}</div>}
+                                                            </div>
+                                                            <div style={{fontSize:'11px', fontWeight:'700', padding:'3px 8px', borderRadius:'8px', background: task.isDone?'rgba(34,197,94,0.1)':'rgba(232,80,58,0.1)', color: task.isDone?'var(--green)':'var(--coral)'}}>{task.isDone?'Concluída':'Pendente'}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {/* MEMBERS */}
+                                        {teamActiveTab === 'members' && (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                                {/* Pending invitations */}
+                                                {(teamDetails.invitations || []).length > 0 && (
+                                                    <div style={{padding:'14px', borderRadius:'14px', border:'1.5px dashed var(--amber)', background:'rgba(245,158,11,0.05)', marginBottom:'8px'}}>
+                                                        <div style={{fontSize:'12px', fontWeight:'700', color:'var(--amber)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'5px'}}><Icons.Clock size={13}/>Convites pendentes</div>
+                                                        {(teamDetails.invitations||[]).map((inv:any) => (
+                                                            <div key={inv.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'13px', color:'var(--ink)', padding:'6px 0', borderBottom:'1px solid var(--cream-dark)'}}>
+                                                                <span>{inv.email} <span style={{color:'var(--ink-light)', fontSize:'11px'}}>· {ROLE_LABELS[inv.role]}</span></span>
+                                                                {isOwner && <button onClick={async () => { await cancelInvitation(inv.id); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} style={{background:'none', border:'none', cursor:'pointer', color:'var(--coral)', fontSize:'12px', fontWeight:'600'}}>Cancelar</button>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {(teamDetails.members || []).map((m:any) => (
+                                                    <div key={m.id} style={{display:'flex', alignItems:'center', gap:'14px', padding:'14px 16px', borderRadius:'14px', border:'1.5px solid var(--cream-dark)', background:'var(--cream)'}}>
+                                                        {m.user.image ? <img src={m.user.image} style={{width:'40px', height:'40px', borderRadius:'50%', flexShrink:0}}/> : <div style={{width:'40px', height:'40px', borderRadius:'50%', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', fontSize:'15px', flexShrink:0}}>{m.user.name?.charAt(0)||'?'}</div>}
+                                                        <div style={{flex:1}}>
+                                                            <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{m.user.name}</div>
+                                                            <div style={{fontSize:'12px', color:'var(--ink-light)'}}>{m.user.email}</div>
+                                                        </div>
+                                                        <span style={{fontSize:'11px', fontWeight:'700', padding:'4px 10px', borderRadius:'20px', background: m.role==='OWNER'?'rgba(232,80,58,0.1)':m.role==='VICE_OWNER'?'rgba(99,102,241,0.1)':m.role==='SUPERVISOR'?'rgba(245,158,11,0.1)':'rgba(34,197,94,0.1)', color: m.role==='OWNER'?'var(--coral)':m.role==='VICE_OWNER'?'#6366f1':m.role==='SUPERVISOR'?'var(--amber)':'var(--green)'}}>{ROLE_LABELS[m.role]||m.role}</span>
+                                                        {isOwner && m.userId !== currentUserData?.id && (
+                                                            <div style={{display:'flex', gap:'4px'}}>
+                                                                <select onChange={async e => { if(!e.target.value) return; await updateMemberRole(selectedTeamId!, m.userId, e.target.value); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} defaultValue="" style={{fontSize:'11px', border:'1.5px solid var(--cream-dark)', borderRadius:'8px', padding:'4px 6px', background:'var(--white)', cursor:'pointer'}}>
+                                                                    <option value="" disabled>Cargo</option>
+                                                                    <option value="VICE_OWNER">Vice-Anfitrião</option>
+                                                                    <option value="SUPERVISOR">Supervisor</option>
+                                                                    <option value="WORKER">Trabalhador</option>
+                                                                </select>
+                                                                <button onClick={async () => { await removeMember(selectedTeamId!, m.userId); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} style={{background:'rgba(232,80,58,0.1)', border:'none', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'var(--coral)'}}><Icons.UserX size={13}/></button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {isOwner && <button onClick={async () => { if(window.confirm('Excluir esta equipe permanentemente?')) { await deleteTeam(selectedTeamId!); setSelectedTeamId(null); setTeamDetails(null); const tms = await getTeams(); setTeams(tms); }}} style={{marginTop:'16px', background:'rgba(232,80,58,0.1)', color:'var(--coral)', border:'1.5px solid rgba(232,80,58,0.2)', borderRadius:'12px', padding:'10px', fontSize:'13px', fontWeight:'600', cursor:'pointer', width:'100%'}}>Excluir Equipe</button>}
+                                            </div>
+                                        )}
+                                        {/* STATS */}
+                                        {teamActiveTab === 'stats' && (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+                                                {!teamStats || teamStats.length === 0 ? <div style={{textAlign:'center', color:'var(--ink-faint)', paddingTop:'40px', fontSize:'13px'}}>Nenhuma estatística disponível.</div> : teamStats.map((s:any) => (
+                                                    <div key={s.userId} style={{padding:'20px', borderRadius:'16px', border:'1.5px solid var(--cream-dark)', background:'var(--cream)'}}>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
+                                                            {s.image ? <img src={s.image} style={{width:'44px', height:'44px', borderRadius:'50%'}}/> : <div style={{width:'44px', height:'44px', borderRadius:'50%', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', fontSize:'16px'}}>{s.name?.charAt(0)||'?'}</div>}
+                                                            <div>
+                                                                <div style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)'}}>{s.name}</div>
+                                                                <div style={{fontSize:'12px', color:'var(--ink-light)'}}>{ROLE_LABELS[s.role]||s.role}</div>
+                                                            </div>
+                                                            <div style={{marginLeft:'auto', fontSize:'28px', fontWeight:'800', color: s.rate===100?'var(--green)':s.rate>=50?'var(--amber)':'var(--coral)', fontFamily:"'Fraunces',serif"}}>{s.rate}%</div>
+                                                        </div>
+                                                        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px', marginBottom:'16px'}}>
+                                                            {[{label:'Total', val:s.total, color:'var(--ink)'},{label:'Concluídas', val:s.done, color:'var(--green)'},{label:'Pendentes', val:s.pending, color:'var(--coral)'}].map(({label,val,color}) => (
+                                                                <div key={label} style={{textAlign:'center', padding:'10px', borderRadius:'12px', background:'var(--white)'}}>
+                                                                    <div style={{fontSize:'22px', fontWeight:'800', color, fontFamily:"'Fraunces',serif"}}>{val}</div>
+                                                                    <div style={{fontSize:'11px', color:'var(--ink-light)'}}>{label}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div style={{marginBottom:'8px'}}>
+                                                            <div style={{fontSize:'11px', color:'var(--ink-light)', marginBottom:'6px'}}>Taxa de conclusão</div>
+                                                            <div style={{height:'8px', background:'var(--white)', borderRadius:'4px', overflow:'hidden'}}>
+                                                                <div style={{height:'100%', width:`${s.rate}%`, background: s.rate===100?'var(--green)':s.rate>=50?'var(--amber)':'var(--coral)', borderRadius:'4px', transition:'width 0.4s'}}/>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{fontSize:'11px', color:'var(--ink-light)', marginBottom:'6px'}}>Tarefas concluídas por dia</div>
+                                                            <div style={{display:'flex', gap:'4px', alignItems:'flex-end', height:'40px'}}>
+                                                                {['D','S','T','Q','Q','S','S'].map((d,i) => {
+                                                                    const max = Math.max(...(s.byDay||[1]), 1);
+                                                                    const h = s.byDay?.[i] ? Math.max(4, Math.round((s.byDay[i]/max)*36)) : 4;
+                                                                    return <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'3px'}}>
+                                                                        <div style={{width:'100%', height:`${h}px`, background: s.byDay?.[i]?'var(--coral)':'var(--cream-dark)', borderRadius:'3px', transition:'height 0.3s'}}/>
+                                                                        <div style={{fontSize:'9px', color:'var(--ink-faint)'}}>{d}</div>
+                                                                    </div>;
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                        <div style={{width:'380px', background:'var(--white)', borderRadius:'24px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', boxShadow:'0 12px 32px rgba(0,0,0,0.02)'}}>
-                            <div style={{padding:'20px', borderBottom:'1px solid var(--cream-dark)'}}>
-                                <h3 style={{fontSize:'16px', fontWeight:'700', color:'var(--ink)', margin:0}}>Mural de Avisos</h3>
-                            </div>
-                            <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--ink-faint)', fontSize:'13px', padding:'20px', textAlign:'center'}}>
-                                Selecione uma equipe para ver o chat e as tarefas do time.
-                            </div>
+                                </>
+                            ) : null}
                         </div>
                     </div>
-                )}
+                    );
+                })()}
                 {activeTab === 'Dashboard' && (
                     <>
                         {currentUserData?.plan === 'FREE' ? (
@@ -2799,10 +2995,77 @@ export default function Home() {
     </div>
 
     </>
+
+    {/* ======== CREATE TEAM MODAL ======== */}
+    {isCreateTeamModalOpen && (
+        <div className="modal-overlay open" onClick={() => setIsCreateTeamModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Criar Nova Equipe</div>
+                <div className="modal-field">
+                    <div className="modal-label">Nome da Equipe</div>
+                    <input className="modal-input" placeholder="Ex: Equipe de Vendas..." value={newTeamName} onChange={e => setNewTeamName(e.target.value)}/>
+                </div>
+                <div className="modal-field">
+                    <div className="modal-label">Descricao (opcional)</div>
+                    <input className="modal-input" placeholder="Descreva o objetivo da equipe..." value={newTeamDescription} onChange={e => setNewTeamDescription(e.target.value)}/>
+                </div>
+                <div className="modal-actions">
+                    <button className="modal-cancel" onClick={() => setIsCreateTeamModalOpen(false)}>Cancelar</button>
+                    <button className="modal-save" onClick={async () => {
+                        if (!newTeamName.trim()) return;
+                        try { await createTeam(newTeamName.trim(), newTeamDescription.trim()); setNewTeamName(''); setNewTeamDescription(''); setIsCreateTeamModalOpen(false); const tms = await getTeams(); setTeams(tms); setSuccessToast('Equipe criada!'); setTimeout(()=>setSuccessToast(''),3000); } catch(e:any) { setSuccessToast(e.message); setTimeout(()=>setSuccessToast(''),4000); }
+                    }}>Criar Equipe</button>
+                </div>
+            </div>
+        </div>
+    )}
+    {isInviteModalOpen && selectedTeamId && (
+        <div className="modal-overlay open" onClick={() => setIsInviteModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Convidar Membro</div>
+                <div className="modal-field"><div className="modal-label">E-mail</div><input className="modal-input" type="email" placeholder="email@exemplo.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Cargo</div><select className="modal-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>{teamDetails?.members?.find((m:any)=>m.userId===currentUserData?.id)?.role==='OWNER'&&<option value="VICE_OWNER">Vice-Anfitriao</option>}<option value="SUPERVISOR">Supervisor</option><option value="WORKER">Trabalhador</option></select></div>
+                <div className="modal-actions">
+                    <button className="modal-cancel" onClick={() => setIsInviteModalOpen(false)}>Cancelar</button>
+                    <button className="modal-save" onClick={async () => { if(!inviteEmail.trim()) return; try { const res = await inviteToTeam(selectedTeamId, inviteEmail.trim(), inviteRole); if((res as any)?.error){setSuccessToast((res as any).error);}else{setSuccessToast('Convite enviado!');} setInviteEmail(''); setIsInviteModalOpen(false); setTimeout(()=>setSuccessToast(''),3000); const det = await getTeamDetails(selectedTeamId); setTeamDetails(det); } catch(e:any){setSuccessToast(e.message);setTimeout(()=>setSuccessToast(''),4000);} }}>Enviar</button>
+                </div>
+            </div>
+        </div>
+    )}
+    {isAssignTaskModalOpen && selectedTeamId && teamDetails && (
+        <div className="modal-overlay open" onClick={() => setIsAssignTaskModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Atribuir Tarefa</div>
+                <div className="modal-field"><div className="modal-label">Titulo</div><input className="modal-input" placeholder="Descricao da tarefa..." value={assignTaskTitle} onChange={e => setAssignTaskTitle(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Para</div><select className="modal-input" value={assignToMemberId} onChange={e => setAssignToMemberId(e.target.value)}><option value="">Selecione...</option>{(teamDetails.members||[]).filter((m:any)=>m.userId!==currentUserData?.id).map((m:any)=><option key={m.id} value={m.userId}>{m.user.name}</option>)}</select></div>
+                <div className="modal-field"><div className="modal-label">Prioridade</div><select className="modal-input" value={assignTaskPriority} onChange={e => setAssignTaskPriority(e.target.value)}><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baixa</option></select></div>
+                <div className="modal-field"><div className="modal-label">Data (opcional)</div><input className="modal-input" type="date" value={assignTaskDate} onChange={e => setAssignTaskDate(e.target.value)}/></div>
+                <div className="modal-actions">
+                    <button className="modal-cancel" onClick={() => setIsAssignTaskModalOpen(false)}>Cancelar</button>
+                    <button className="modal-save" onClick={async () => { if(!assignTaskTitle.trim()||!assignToMemberId) return; try { await assignTaskToMember(selectedTeamId, assignToMemberId, assignTaskTitle.trim(), assignTaskPriority, assignTaskDate||undefined); setAssignTaskTitle(''); setAssignToMemberId(''); setAssignTaskDate(''); setIsAssignTaskModalOpen(false); setSuccessToast('Tarefa atribuida!'); setTimeout(()=>setSuccessToast(''),3000); const [det,st]=await Promise.all([getTeamDetails(selectedTeamId),getTeamStats(selectedTeamId)]); setTeamDetails(det); setTeamStats(st); } catch(e:any){setSuccessToast(e.message);setTimeout(()=>setSuccessToast(''),4000);} }}>Atribuir</button>
+                </div>
+            </div>
+        </div>
+    )}
+    {isInvitationsModalOpen && (
+        <div className="modal-overlay open" onClick={() => setIsInvitationsModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Convites Pendentes</div>
+                {myInvitations.length === 0 ? <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:'14px'}}>Nenhum convite pendente.</div> : myInvitations.map((inv:any) => (
+                    <div key={inv.id} style={{padding:'16px',borderRadius:'14px',border:'1.5px solid var(--cream-dark)',marginBottom:'12px'}}>
+                        <div style={{fontWeight:'700',fontSize:'15px',color:'var(--ink)',marginBottom:'4px'}}>{inv.team?.name}</div>
+                        <div style={{fontSize:'13px',color:'var(--ink-light)',marginBottom:'12px'}}>Convidado como <b>{inv.role==='WORKER'?'Trabalhador':inv.role==='SUPERVISOR'?'Supervisor':inv.role==='VICE_OWNER'?'Vice-Anfitriao':inv.role}</b></div>
+                        <div style={{display:'flex',gap:'8px'}}>
+                            <button onClick={async()=>{await respondToInvitation(inv.id,true);const i2=await getMyInvitations();setMyInvitations(i2);const tms=await getTeams();setTeams(tms);setSuccessToast('Convite aceito!');setTimeout(()=>setSuccessToast(''),3000);}} style={{flex:1,background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',padding:'10px',fontWeight:'600',cursor:'pointer',fontSize:'13px'}}>Aceitar</button>
+                            <button onClick={async()=>{await respondToInvitation(inv.id,false);const i2=await getMyInvitations();setMyInvitations(i2);setSuccessToast('Recusado.');setTimeout(()=>setSuccessToast(''),3000);}} style={{flex:1,background:'var(--cream)',color:'var(--ink)',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',padding:'10px',fontWeight:'600',cursor:'pointer',fontSize:'13px'}}>Recusar</button>
+                        </div>
+                    </div>
+                ))}
+                <button className="modal-cancel" onClick={() => setIsInvitationsModalOpen(false)} style={{width:'100%',marginTop:'8px'}}>Fechar</button>
+            </div>
+        </div>
+    )}
+
+    </>
   );
 }
-
-
-
-
-

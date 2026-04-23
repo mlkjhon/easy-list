@@ -56,8 +56,9 @@ model User {
   shoppingLists ShoppingList[]
 
   // Teams
-  teamMembers   TeamMember[]
-  teamMessages  TeamMessage[]
+  teamMembers    TeamMember[]
+  teamMessages   TeamMessage[]
+  invitationsReceived TeamInvitation[] @relation("InvitedUser")
 
   // Admin & Billing
   role             String    @default("USER") // USER, ADMIN
@@ -96,23 +97,25 @@ model Routine {
 }
 
 model Task {
-  id          String   @id @default(cuid())
-  title       String
-  isDone      Boolean  @default(false)
-  priority    String   @default("low") // high, medium, low
-  date        DateTime?
-  time        String?
-  startTime   String?  // HH:MM format
-  endTime     String?  // HH:MM format
-  routineName String?
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  teamId      String?
-  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  title        String
+  isDone       Boolean  @default(false)
+  priority     String   @default("low") // high, medium, low
+  date         DateTime?
+  time         String?
+  startTime    String?  // HH:MM format
+  endTime      String?  // HH:MM format
+  routineName  String?
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  teamId       String?
+  team         Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  assignedToId String?  // userId of the team member this task is assigned to
+  assignedById String?  // userId of who assigned this task
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model ShoppingList {
@@ -142,33 +145,51 @@ model Team {
   name        String
   description String?
   color       String   @default("#3D7A5E")
+  ownerId     String   // ID of the Anfitrião (owner)
   createdAt   DateTime @default(now())
   
   members     TeamMember[]
   messages    TeamMessage[]
   tasks       Task[]
+  invitations TeamInvitation[]
 }
 
 model TeamMember {
-  id          String   @id @default(cuid())
-  teamId      String
-  userId      String
-  role        String   @default("MEMBER") // ADMIN, MEMBER
-  joinedAt    DateTime @default(now())
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  // Roles: OWNER | VICE_OWNER | SUPERVISOR | WORKER
+  role      String   @default("WORKER")
+  joinedAt  DateTime @default(now())
   
-  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, userId])
 }
 
-model TeamMessage {
-  id          String   @id @default(cuid())
-  content     String
-  teamId      String
-  userId      String
-  createdAt   DateTime @default(now())
+model TeamInvitation {
+  id        String   @id @default(cuid())
+  teamId    String
+  email     String
+  invitedUserId String?  // Filled when a registered user matches the email
+  role      String   @default("WORKER") // VICE_OWNER | SUPERVISOR | WORKER
+  status    String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt DateTime @default(now())
   
-  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team         Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUser  User? @relation("InvitedUser", fields: [invitedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([teamId, email])
+}
+
+model TeamMessage {
+  id        String   @id @default(cuid())
+  content   String
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+  
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
