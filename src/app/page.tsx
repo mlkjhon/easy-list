@@ -265,7 +265,8 @@ export default function Home() {
       setNewTaskTitle(opts.taskToEdit.title);
       setNewTaskPriority(opts.taskToEdit.priority);
       setNewTaskDate(opts.taskToEdit.date ? new Date(opts.taskToEdit.date).toISOString().split('T')[0] : "");
-      setNewTaskTime(opts.taskToEdit.time || "");
+      setNewTaskStartTime(opts.taskToEdit.startTime || "");
+      setNewTaskEndTime(opts.taskToEdit.endTime || "");
       setNewTaskRoutine(opts.taskToEdit.routineName || "");
       setPresetProjectId(opts.taskToEdit.projectId || null);
       setPresetImportant(opts.taskToEdit.priority === 'high');
@@ -276,7 +277,8 @@ export default function Home() {
     setNewTaskTitle("");
     setNewTaskPriority(opts?.priority || "medium");
     setNewTaskDate(opts?.date || "");
-    setNewTaskTime("");
+    setNewTaskStartTime("");
+    setNewTaskEndTime("");
     setNewTaskRoutine("");
     setPresetProjectId(opts?.projectId || null);
     setPresetImportant(opts?.important || false);
@@ -289,10 +291,31 @@ export default function Home() {
   const handleSaveTask = async () => {
     if (!newTaskTitle.trim()) return;
     
+    if (newTaskDate && newTaskStartTime && newTaskEndTime) {
+      const start = newTaskStartTime;
+      const end = newTaskEndTime;
+      if (start >= end) {
+        setAuthError('Horário inválido! O fim deve ser após o início.');
+        return;
+      }
+      const overlappingTask = tasks.find(t => {
+        if (t.id === editTaskId) return false;
+        if (!t.date || !t.startTime || !t.endTime) return false;
+        const tDate = new Date(t.date).toISOString().split('T')[0];
+        if (tDate !== newTaskDate) return false;
+        return (start < t.endTime && end > t.startTime);
+      });
+      if (overlappingTask) {
+        setAuthError('Horário ocupado! Já existe uma tarefa neste período.');
+        return;
+      }
+    }
+    
     const taskData = {
       title: newTaskTitle,
       priority: presetImportant ? 'high' : newTaskPriority,
-      time: newTaskTime || undefined,
+      startTime: newTaskStartTime || undefined,
+      endTime: newTaskEndTime || undefined,
       date: newTaskDate || undefined,
       routineName: newTaskRoutine || undefined,
       projectId: presetProjectId || undefined,
@@ -322,12 +345,13 @@ export default function Home() {
 
   const getExpirationText = (t: any) => {
     if (t.isDone || !t.date) return null;
-    const nowStr = new Date().toISOString().split('T')[0];
-    const taskDateStr = new Date(t.date).toISOString().split('T')[0];
-    if (nowStr === taskDateStr) return <span style={{color:'var(--amber)', fontWeight:'600'}}>· ⏳ Expira hoje {t.time ? `às ${t.time}` : ''}</span>;
-    const timeDiff = new Date(t.date).getTime() - new Date().getTime();
-    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-    if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira amanhã {t.time ? `às ${t.time}` : ''}</span>;
+    const now = new Date();
+    const nowStr = now.toISOString().split('T')[0];
+    const taskDate = new Date(t.date);
+    const taskDateStr = taskDate.toISOString().split('T')[0];
+    if (nowStr === taskDateStr) return <span style={{color:'var(--amber)', fontWeight:'600'}}>• Expira hoje {t.endTime ? `às ${t.endTime}` : ''}</span>;
+    const daysDiff = Math.ceil((taskDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
+    if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>• Expira amanhã {t.endTime ? `às ${t.endTime}` : ''}</span>;
     if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira em {daysDiff} dias</span>;
     return null;
   };
@@ -356,7 +380,7 @@ export default function Home() {
           <div className="task-meta">
             <div className="task-project-dot" style={{background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)'}}></div>
             <span>{t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Média' : 'Baixa'}</span>
-            {t.time && <span>· {t.time}</span>}
+            {t.startTime && <span>• {t.startTime} - {t.endTime}</span>}
             {t.routineName && <span>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
             {t.projectId && <span>· <Icons.Folder size={12} style={{display:'inline',marginBottom:'-2px'}}/> {projects.find((p:any)=>p.id===t.projectId)?.name || 'Projeto'}</span>}
             {locked && <span style={{color:'var(--ink-light)'}}>· 🔒 Futuro</span>}
@@ -1400,7 +1424,7 @@ export default function Home() {
                                         {isOverdue && <span style={{display:'flex',alignItems:'center',gap:'4px',color:'var(--coral)',fontWeight:'600'}}><Icons.AlertCircle size={12} strokeWidth={2} /> Atrasada</span>}
                                         {t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.routineName}</span>}
                                         {t.date && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> {new Date(t.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span>}
-                                        {t.time && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Hourglass size={12} color="var(--ink-mid)" /> {t.time}</span>}
+                                        {t.startTime && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.startTime} - {t.endTime}</span>}
                                     </div>
                                 </div>
                             )})}
@@ -2379,7 +2403,19 @@ export default function Home() {
     
     <div className={`modal-overlay ${isModalOpen ? 'open' : ''}`} id="modal">
         <div className="modal">
-            <div className="modal-title">{presetImportant ? 'Nova Tarefa Importante' : 'Nova Tarefa'}</div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px'}}>
+                <div className="modal-title" style={{marginBottom:0}}>{presetImportant ? 'Nova Tarefa Importante' : 'Nova Tarefa'}</div>
+                <button onClick={() => {
+                    setNewTaskTitle("Revisar estratégia de Q" + Math.ceil((new Date().getMonth() + 1) / 3));
+                    setNewTaskDate(new Date().toISOString().split('T')[0]);
+                    setNewTaskStartTime("14:00");
+                    setNewTaskEndTime("15:30");
+                    setNewTaskPriority("high");
+                    setAuthError('');
+                }} style={{background:'linear-gradient(135deg, var(--coral), var(--purple))', color:'white', border:'none', padding:'6px 12px', borderRadius:'10px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px'}}>
+                    ✨ IA Sugerir
+                </button>
+            </div>
             <div className="modal-field">
                 <div className="modal-label">Título</div>
                 <input className="modal-input" type="text" placeholder="O que precisa ser feito?" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveTask()} autoFocus />
@@ -2390,15 +2426,12 @@ export default function Home() {
                     <input className="modal-input" type="date" value={newTaskDate} onChange={e => setNewTaskDate(e.target.value)} />
                 </div>
                 <div className="modal-field">
-                    <div className="modal-label">Tempo estimado</div>
-                    <select className="modal-select modal-input" value={newTaskTime} onChange={e => setNewTaskTime(e.target.value)}>
-                        <option value="">Sem estimativa</option>
-                        <option value="15min">15 min</option>
-                        <option value="30min">30 min</option>
-                        <option value="1h">1 hora</option>
-                        <option value="2h">2 horas</option>
-                        <option value="3h+">Mais de 3h</option>
-                    </select>
+                    <div className="modal-label">Horário (Das / Até)</div>
+                    <div style={{display:'flex', gap:'8px'}}>
+                        <input className="modal-input" type="time" value={newTaskStartTime} onChange={e => setNewTaskStartTime(e.target.value)} style={{padding:'10px 8px'}} title="Início" />
+                        <span style={{alignSelf:'center', color:'var(--ink-faint)', fontSize:'12px'}}>-</span>
+                        <input className="modal-input" type="time" value={newTaskEndTime} onChange={e => setNewTaskEndTime(e.target.value)} style={{padding:'10px 8px'}} title="Fim" />
+                    </div>
                 </div>
             </div>
             <div className="modal-row">
