@@ -2205,7 +2205,7 @@ export default function Home() {
                         <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'24px',alignItems:'center'}}>
                             <select
                                 style={{flex:'1 1 200px',padding:'10px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'14px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}}
-                                value={selectedListId}
+                                value={selectedListId || ""}
                                 onChange={e => setSelectedListId(e.target.value)}
                             >
                                 {shoppingLists.length === 0 && <option value="">Nenhuma lista</option>}
