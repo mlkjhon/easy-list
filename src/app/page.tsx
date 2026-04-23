@@ -1517,6 +1517,7 @@ export default function Home() {
                                             ))}
                                         </div>
                                     )
+                                })()}
                                 <button onClick={async () => {
                                     if (currentUserData?.plan === 'FREE') {
                                         setSuccessToast('Plano FREE não possui compartilhamento avançado. Faça upgrade!');
