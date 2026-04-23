@@ -169,7 +169,7 @@ export default function Home() {
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
           if (params.get('checkout') === 'success') {
-            setSuccessToast('🎉 Pagamento confirmado! Seu plano foi ativado.');
+            setSuccessToast('Pagamento confirmado! Seu plano foi ativado.');
             setTimeout(() => setSuccessToast(''), 5000);
             window.history.replaceState({}, '', '/');
           } else if (params.get('checkout') === 'cancel') {
@@ -370,7 +370,7 @@ export default function Home() {
   };
 
   const isTaskLocked = (t: any) => activeTab === 'Esta Semana' && t.date && new Date(t.date).toISOString().split('T')[0] > new Date().toISOString().split('T')[0];
-  const isTaskOverdue = (t: any) => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
+  const isTaskOverdue = (t: any) => !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
 
   const getExpirationText = (t: any) => {
     if (t.isDone || !t.date) return null;
@@ -381,7 +381,7 @@ export default function Home() {
     if (nowStr === taskDateStr) return <span style={{color:'var(--amber)', fontWeight:'600'}}>• Expira hoje {t.endTime ? `às ${t.endTime}` : ''}</span>;
     const daysDiff = Math.ceil((taskDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
     if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>• Expira amanhã {t.endTime ? `às ${t.endTime}` : ''}</span>;
-    if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira em {daysDiff} dias</span>;
+    if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>• Expira em {daysDiff} dias</span>;
     return null;
   };
 
@@ -412,7 +412,7 @@ export default function Home() {
             {t.startTime && <span>• {t.startTime} - {t.endTime}</span>}
             {t.routineName && <span>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
             {t.projectId && <span>· <Icons.Folder size={12} style={{display:'inline',marginBottom:'-2px'}}/> {projects.find((p:any)=>p.id===t.projectId)?.name || 'Projeto'}</span>}
-            {locked && <span style={{color:'var(--ink-light)'}}>· 🔒 Futuro</span>}
+            {locked && <span style={{color:'var(--ink-light)'}}>• Futuro</span>}
             {overdue && <span style={{color:'var(--coral)', fontWeight:'600'}}>· ⚠️ Atrasada ({new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>}
             {expirationText}
           </div>
@@ -795,10 +795,10 @@ export default function Home() {
                     <div className="pricing-period" style={{"color":"rgba(255,255,255,0.5)"}}>por mês</div>
                     <ul className="pricing-features">
                         <li>✅ Tudo do plano Gratuito</li>
-                        <li>🚀 Dashboard avançado</li>
-                        <li>🚀 Relatórios de produtividade</li>
-                        <li>🚀 Compartilhar projetos (até 3)</li>
-                        <li>🚀 Suporte prioritário</li>
+                        <li>Dashboard avançado</li>
+                        <li>Relatórios de produtividade</li>
+                        <li>Compartilhar projetos (até 3)</li>
+                        <li>Suporte prioritário</li>
                         <li>🤖 IA Assistente (em breve)</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Assinar Pro</button>
@@ -1338,7 +1338,7 @@ export default function Home() {
                             const greetKey = hour < 12 ? 'goodMorning' : hour < 18 ? 'goodAfternoon' : 'goodEvening';
                             const greeting = `${t(greetKey, lang)}${name ? `, ${name}` : ''}!`;
 
-                            const overdueTasks = tasks.filter(t => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < todayStr);
+                            const overdueTasks = tasks.filter(t => !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < todayStr);
                             const todayTasks = tasks.filter(t => !t.isDone && (!t.date || new Date(t.date).toISOString().split('T')[0] === todayStr));
                             const importantPending = tasks.filter(t => !t.isDone && t.priority === 'high' && (!t.date || new Date(t.date).toISOString().split('T')[0] <= todayStr));
                             const allPending = tasks.filter(t => !t.isDone && (!t.date || new Date(t.date).toISOString().split('T')[0] <= todayStr));
@@ -1435,7 +1435,7 @@ export default function Home() {
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))',gap:'16px'}}>
                             {tasks.filter(t => !t.isDone && !t.projectId).map(t => {
-                                const isOverdue = !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
+                                const isOverdue = !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
                                 return (
                                 <div key={t.id} style={{background: 'var(--white)', padding: '20px', borderRadius: '16px', border: '1px solid var(--cream-dark)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden'}}>
                                     <div style={{position:'absolute',top:0,left:0,bottom:0,width:'4px',background: t.priority==='high'?'var(--coral)':t.priority==='medium'?'var(--amber)':'var(--green)'}}></div>
@@ -1454,7 +1454,8 @@ export default function Home() {
                                     <div style={{fontSize:'12px',color:'var(--ink-light)',display:'flex',flexWrap:'wrap',gap:'12px',alignItems:'center'}}>
                                         {isOverdue && <span style={{display:'flex',alignItems:'center',gap:'4px',color:'var(--coral)',fontWeight:'600'}}><Icons.AlertCircle size={12} strokeWidth={2} /> Atrasada</span>}
                                         {t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.routineName}</span>}
-                                        {t.date && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> {new Date(t.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span>}
+                                        {t.date && !t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> {new Date(t.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span>}
+                                        {t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> Hoje</span>}
                                         {t.startTime && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.startTime} - {t.endTime}</span>}
                                     </div>
                                 </div>
@@ -2064,7 +2065,7 @@ export default function Home() {
 
                         <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'12px', marginBottom:'40px'}}>
                             <span style={{fontSize:'14px', fontWeight:'600', color: !billingAnnual ? 'var(--ink)' : 'var(--ink-light)'}}>Mensal</span>
-                            <div className="toggle-switch" onClick={() => setBillingAnnual(!billingAnnual)} style={{width:'50px', height:'28px', background:'var(--cream-dark)', borderRadius:'20px', position:'relative', cursor:'pointer'}}>
+                            <div className="toggle-switch" onClick={() => setBillingAnnual(!billingAnnual)} style={{width:'50px', height:'28px', background: billingAnnual ? 'var(--coral)' : 'var(--ink-light)', borderRadius:'20px', position:'relative', cursor:'pointer'}}>
                                 <div style={{width:'22px', height:'22px', background:'var(--white)', borderRadius:'50%', position:'absolute', top:'3px', left: billingAnnual ? '25px' : '3px', transition:'all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}></div>
                             </div>
                             <span style={{fontSize:'14px', fontWeight:'600', color: billingAnnual ? 'var(--ink)' : 'var(--ink-light)'}}>Anual <span style={{fontSize:'11px', background:'rgba(61,122,94,0.1)', color:'var(--green)', padding:'2px 6px', borderRadius:'10px', marginLeft:'4px'}}>-20%</span></span>
@@ -2085,7 +2086,8 @@ export default function Home() {
                             <div style={{background:'var(--white)', border:'1px solid var(--cream-dark)', borderRadius:'20px', padding:'32px', display:'flex', flexDirection:'column'}}>
                                 <div style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', marginBottom:'4px'}}>Pro</div>
                                 <div style={{fontSize:'14px', color:'var(--ink-light)', marginBottom:'20px'}}>Para acelerar seus resultados.</div>
-                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", color:'var(--ink)', marginBottom:'24px'}}>R${billingAnnual ? '23' : '29'}<span style={{fontSize:'18px',fontWeight:500,color:'var(--ink-mid)'}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', color:'var(--ink-light)', fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", color:'var(--ink)', marginBottom: billingAnnual ? '4px' : '24px'}}>R${billingAnnual ? '23' : '29'}<span style={{fontSize:'18px',fontWeight:500,color:'var(--ink-mid)'}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', color:'var(--ink-light)', fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                {billingAnnual && <div style={{fontSize:'12px', color:'var(--ink-light)', fontWeight:'500', marginBottom:'20px'}}>Cobrado R$ 286,80 por ano</div>}
                                 
                                 <ul style={{listStyle:'none', padding:0, margin:'0 0 32px 0', flex:1, display:'flex', flexDirection:'column', gap:'12px'}}>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Tudo do plano Free</li>
@@ -2096,7 +2098,7 @@ export default function Home() {
                                 <button onClick={async () => {
                                     // Simulation of payment
                                     const res = await adminUpdateUserPlan(currentUserData.id, "PRO");
-                                    setSuccessToast('🎉 Plano Pro ativado com sucesso! Você já pode aproveitar o Dashboard.');
+                                    setSuccessToast(`Plano Pro (${billingAnnual ? 'Anual' : 'Mensal'}) ativado com sucesso! Você já pode aproveitar o Dashboard.`);
                                     setTimeout(() => setSuccessToast(''), 4000);
                                     window.history.replaceState({}, '', '/?checkout=success');
                                     window.location.reload();
@@ -2108,7 +2110,8 @@ export default function Home() {
                                 <div style={{position:'absolute', top:'-12px', right:'32px', background:'var(--white)', color:'var(--coral)', fontSize:'11px', fontWeight:'700', padding:'6px 12px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px'}}>Mais Popular</div>
                                 <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'4px'}}>Premium</div>
                                 <div style={{fontSize:'14px', opacity:0.8, marginBottom:'20px'}}>Inteligência Artificial & Times.</div>
-                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", marginBottom:'24px'}}>R${billingAnnual ? '47' : '59'}<span style={{fontSize:'18px',fontWeight:500,opacity:0.8}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', opacity:0.8, fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", marginBottom: billingAnnual ? '4px' : '24px'}}>R${billingAnnual ? '47' : '59'}<span style={{fontSize:'18px',fontWeight:500,opacity:0.8}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', opacity:0.8, fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                {billingAnnual && <div style={{fontSize:'12px', color:'rgba(255,255,255,0.7)', fontWeight:'500', marginBottom:'20px'}}>Cobrado R$ 574,80 por ano</div>}
                                 
                                 <ul style={{listStyle:'none', padding:0, margin:'0 0 32px 0', flex:1, display:'flex', flexDirection:'column', gap:'12px'}}>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Tudo do plano Pro</li>
@@ -2121,7 +2124,7 @@ export default function Home() {
                                     const res = await fetch('/api/checkout', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ plan: 'PREMIUM' })
+                                        body: JSON.stringify({ plan: 'PREMIUM', billingAnnual })
                                     });
                                     if(res.ok) {
                                         const { url } = await res.json();
@@ -2304,7 +2307,7 @@ export default function Home() {
                             const pendingItems = items.filter((i: any) => !i.purchased);
                             const purchasedItems = items.filter((i: any) => i.purchased);
                             const total = items.reduce((acc: number, i: any) => acc + (i.purchased ? 0 : (i.estimatedPrice ?? 0) * (i.quantity ?? 1)), 0);
-                            const catIcons: Record<string,string> = {'Hortifruti':'🥦','Mercearia':'🛒','Limpeza':'🧹','Higiene':'🧴','Bebidas':'🥤','Outros':'📦'};
+                            const catIcons: Record<string,string> = {'Hortifruti':'🥦','Mercearia':'🛒','Limpeza':'🧹','Higiene':'Higiene','Bebidas':'🥤','Outros':'Outros'};
                             const cats = ['Hortifruti','Mercearia','Limpeza','Higiene','Bebidas','Outros'];
                             return (
                                 <div>
@@ -2444,7 +2447,7 @@ export default function Home() {
                     setNewTaskPriority("high");
                     setAuthError('');
                 }} style={{background:'linear-gradient(135deg, var(--coral), var(--purple))', color:'white', border:'none', padding:'6px 12px', borderRadius:'10px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px'}}>
-                    ✨ IA Sugerir
+                    IA Sugerir
                 </button>
             </div>
             <div className="modal-field">
@@ -2601,7 +2604,14 @@ export default function Home() {
 
     {/* ======== AI ASSISTANT FAB & PANEL ======== */}
     {['Meu Dia', 'Caixa de Entrada', 'Esta Semana', 'Lista de Compras', 'Rotinas'].includes(activeTab) && (
-        <button className="ai-fab" onClick={() => setIsAiChatOpen(true)} title="Assistente IA">
+        <button className="ai-fab" onClick={() => {
+            if (currentUserData?.plan !== 'PREMIUM') {
+                setSuccessToast('Acesso restrito. O Assistente IA é exclusivo do Plano Premium.');
+                setTimeout(() => setSuccessToast(''), 4000);
+                return;
+            }
+            setIsAiChatOpen(true);
+        }} title="Assistente IA">
             <Icons.Sparkles size={24} />
         </button>
     )}
@@ -2640,3 +2650,4 @@ export default function Home() {
     </>
   );
 }
+
