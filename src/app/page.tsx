@@ -142,20 +142,6 @@ export default function Home() {
 
   const { data: session, status } = useSession();
 
-  if (status === "loading") {
-    return (
-      <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--cream)', color:'var(--ink)'}}>
-        <style>{`
-          @keyframes spin { 100% { transform: rotate(360deg); } }
-          .animate-spin { animation: spin 1s linear infinite; }
-        `}</style>
-        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px'}} />
-        <h2 style={{fontSize:'18px', fontWeight:'600'}}>Acessando sua conta...</h2>
-      </div>
-    );
-  }
-
-
   useEffect(() => {
     if (status === "authenticated") {
       getCurrentUserData().then(async (data) => {
@@ -465,6 +451,19 @@ export default function Home() {
       </div>
     );
   };
+
+  if (status === "loading") {
+    return (
+      <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--cream)', color:'var(--ink)'}}>
+        <style>{`
+          @keyframes spin { 100% { transform: rotate(360deg); } }
+          .animate-spin { animation: spin 1s linear infinite; }
+        `}</style>
+        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px'}} />
+        <h2 style={{fontSize:'18px', fontWeight:'600'}}>Acessando sua conta...</h2>
+      </div>
+    );
+  }
 
   return (
     <>
