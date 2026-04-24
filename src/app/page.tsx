@@ -5,10 +5,14 @@ import * as Icons from "lucide-react";
 import { type Lang, getLangFromBrowser, t } from '@/lib/translations';
 import {
   getTasks, createTask, updateTask, toggleTask, rescheduleTask, deleteTask, registerUser,
-  getProjects, createProject, deleteProject,
+  getProjects, createProject, deleteProject, getTeams, createTeam, deleteTeam, getTeamDetails, sendTeamMessage,
+  inviteToTeam, respondToInvitation, updateMemberRole, removeMember, assignTaskToMember, getTeamStats, cancelInvitation, getMyInvitations,
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
-  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject
+  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject,
+  getShoppingLists, createShoppingList, deleteShoppingList, renameShoppingList,
+  createShoppingItem, updateShoppingItem, toggleShoppingItem, deleteShoppingItem,
+  clearPurchasedItems, duplicateShoppingList
 } from "./actions";
 
 export default function Home() {
@@ -33,16 +37,27 @@ export default function Home() {
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDate, setNewTaskDate] = useState("");
   const [newTaskTime, setNewTaskTime] = useState("");
+  const [newTaskStartTime, setNewTaskStartTime] = useState("");
+  const [newTaskEndTime, setNewTaskEndTime] = useState("");
   const [newTaskRoutine, setNewTaskRoutine] = useState("");
   const [presetProjectId, setPresetProjectId] = useState<string|null>(null);
   const [presetImportant, setPresetImportant] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string|null>(null);
   
+  // AI Chat State
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', content:string}[]>([
+    { role: 'ai', content: 'Olá! Sou seu Assistente Easy List. O que você gostaria de analisar hoje?' }
+  ]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
+
   // UI Globals
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Projects
   const [projects, setProjects] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectColor, setNewProjectColor] = useState("#E8503A");
@@ -95,6 +110,58 @@ export default function Home() {
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
 
+  // Shopping Lists
+  const [shoppingLists, setShoppingLists] = useState<any[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string|null>(null);
+  const [isNewListModalOpen, setIsNewListModalOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQty, setNewItemQty] = useState("1");
+  const [newItemUnit, setNewItemUnit] = useState("un");
+  const [newItemCategory, setNewItemCategory] = useState("Outros");
+  const [newItemPrice, setNewItemPrice] = useState("");
+  const [editingItemId, setEditingItemId] = useState<string|null>(null);
+
+  // My Tasks filters
+  const [taskSearch, setTaskSearch] = useState("");
+  const [taskFilterStatus, setTaskFilterStatus] = useState("all");
+  const [taskFilterPriority, setTaskFilterPriority] = useState("all");
+  const [taskFilterProject, setTaskFilterProject] = useState("all");
+  const [taskFilterDate, setTaskFilterDate] = useState("all");
+  const [taskSortBy, setTaskSortBy] = useState("date");
+  const [taskViewMode, setTaskViewMode] = useState<'list'|'cards'>('list');
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkSelected, setBulkSelected] = useState<string[]>([]);
+  const [newItemQuantity, setNewItemQuantity] = useState("1");
+  const [shareProjectId, setShareProjectId] = useState<string|null>(null);
+  const [shareEmailInput, setShareEmailInput] = useState('');
+
+  // Teams
+  const [selectedTeamId, setSelectedTeamId] = useState<string|null>(null);
+  const [teamDetails, setTeamDetails] = useState<any>(null);
+  const [teamStats, setTeamStats] = useState<any>(null);
+  const [myInvitations, setMyInvitations] = useState<any[]>([]);
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamDescription, setNewTeamDescription] = useState('');
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('WORKER');
+  const [teamChatInput, setTeamChatInput] = useState('');
+  const [isAssignTaskModalOpen, setIsAssignTaskModalOpen] = useState(false);
+  const [assignToMemberId, setAssignToMemberId] = useState('');
+  const [assignTaskTitle, setAssignTaskTitle] = useState('');
+  const [assignTaskPriority, setAssignTaskPriority] = useState('medium');
+  const [assignTaskDate, setAssignTaskDate] = useState('');
+  const [teamActiveTab, setTeamActiveTab] = useState<'chat'|'tasks'|'members'|'stats'>('chat');
+  const [isInvitationsModalOpen, setIsInvitationsModalOpen] = useState(false);
+  const [isTeamDetailLoading, setIsTeamDetailLoading] = useState(false);
+
+  // Pricing billing toggle
+  const [billingAnnual, setBillingAnnual] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number|null>(null);
+
   const { data: session, status } = useSession();
 
   useEffect(() => {
@@ -107,10 +174,14 @@ export default function Home() {
         }
         setCurrentUserData(data);
 
-        const [t, p, r] = await Promise.all([getTasks(), getProjects(), getRoutines()]);
+        const [t, p, r, sl, tms, invs] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists(), getTeams(), getMyInvitations()]);
+        setTeams(tms);
+        setMyInvitations(invs || []);
         setTasks(t);
         setProjects(p);
         setRoutines(r);
+        setShoppingLists(sl);
+        if (sl.length > 0) setSelectedListId(sl[0].id);
 
         getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
         
@@ -125,7 +196,7 @@ export default function Home() {
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
           if (params.get('checkout') === 'success') {
-            setSuccessToast('🎉 Pagamento confirmado! Seu plano foi ativado.');
+            setSuccessToast('Pagamento confirmado! Seu plano foi ativado.');
             setTimeout(() => setSuccessToast(''), 5000);
             window.history.replaceState({}, '', '/');
           } else if (params.get('checkout') === 'cancel') {
@@ -229,7 +300,8 @@ export default function Home() {
       setNewTaskTitle(opts.taskToEdit.title);
       setNewTaskPriority(opts.taskToEdit.priority);
       setNewTaskDate(opts.taskToEdit.date ? new Date(opts.taskToEdit.date).toISOString().split('T')[0] : "");
-      setNewTaskTime(opts.taskToEdit.time || "");
+      setNewTaskStartTime(opts.taskToEdit.startTime || "");
+      setNewTaskEndTime(opts.taskToEdit.endTime || "");
       setNewTaskRoutine(opts.taskToEdit.routineName || "");
       setPresetProjectId(opts.taskToEdit.projectId || null);
       setPresetImportant(opts.taskToEdit.priority === 'high');
@@ -240,7 +312,8 @@ export default function Home() {
     setNewTaskTitle("");
     setNewTaskPriority(opts?.priority || "medium");
     setNewTaskDate(opts?.date || "");
-    setNewTaskTime("");
+    setNewTaskStartTime("");
+    setNewTaskEndTime("");
     setNewTaskRoutine("");
     setPresetProjectId(opts?.projectId || null);
     setPresetImportant(opts?.important || false);
@@ -250,13 +323,55 @@ export default function Home() {
   const refreshStats = () =>
     getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
 
+  const handleSendAiMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    const userMsg = chatInput.trim();
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatInput("");
+    setIsAiTyping(true);
+
+    // Mock AI Reply
+    setTimeout(() => {
+      setIsAiTyping(false);
+      let aiResponse = `Este é um protótipo visual! Em breve me conectarei à API do Gemini para respostas reais. Pude ver que você tem ${tasks.length} tarefas pendentes. Posso te ajudar a organizá-las?`;
+      if (userMsg.toLowerCase().includes("hoje")) {
+        const todayTasks = tasks.filter(t => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0]);
+        aiResponse = `Você tem ${todayTasks.length} tarefas pendentes para hoje. Que tal focarmos nas de prioridade Alta primeiro?`;
+      }
+      setChatMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
+    }, 1500);
+  };
+
   const handleSaveTask = async () => {
     if (!newTaskTitle.trim()) return;
+    
+    if (newTaskDate && newTaskStartTime && newTaskEndTime) {
+      const start = newTaskStartTime;
+      const end = newTaskEndTime;
+      if (start >= end) {
+        setAuthError('Horário inválido! O fim deve ser após o início.');
+        return;
+      }
+      const overlappingTask = tasks.find(t => {
+        if (t.id === editTaskId) return false;
+        if (!t.date || !t.startTime || !t.endTime) return false;
+        const tDate = new Date(t.date).toISOString().split('T')[0];
+        if (tDate !== newTaskDate) return false;
+        return (start < t.endTime && end > t.startTime);
+      });
+      if (overlappingTask) {
+        setAuthError('Horário ocupado! Já existe uma tarefa neste período.');
+        return;
+      }
+    }
     
     const taskData = {
       title: newTaskTitle,
       priority: presetImportant ? 'high' : newTaskPriority,
-      time: newTaskTime || undefined,
+      startTime: newTaskStartTime || undefined,
+      endTime: newTaskEndTime || undefined,
       date: newTaskDate || undefined,
       routineName: newTaskRoutine || undefined,
       projectId: presetProjectId || undefined,
@@ -282,17 +397,18 @@ export default function Home() {
   };
 
   const isTaskLocked = (t: any) => activeTab === 'Esta Semana' && t.date && new Date(t.date).toISOString().split('T')[0] > new Date().toISOString().split('T')[0];
-  const isTaskOverdue = (t: any) => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
+  const isTaskOverdue = (t: any) => !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
 
   const getExpirationText = (t: any) => {
     if (t.isDone || !t.date) return null;
-    const nowStr = new Date().toISOString().split('T')[0];
-    const taskDateStr = new Date(t.date).toISOString().split('T')[0];
-    if (nowStr === taskDateStr) return <span style={{color:'var(--amber)', fontWeight:'600'}}>· ⏳ Expira hoje {t.time ? `às ${t.time}` : ''}</span>;
-    const timeDiff = new Date(t.date).getTime() - new Date().getTime();
-    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-    if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira amanhã {t.time ? `às ${t.time}` : ''}</span>;
-    if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>· ⏳ Expira em {daysDiff} dias</span>;
+    const now = new Date();
+    const nowStr = now.toISOString().split('T')[0];
+    const taskDate = new Date(t.date);
+    const taskDateStr = taskDate.toISOString().split('T')[0];
+    if (nowStr === taskDateStr) return <span style={{color:'var(--amber)', fontWeight:'600'}}>• Expira hoje {t.endTime ? `às ${t.endTime}` : ''}</span>;
+    const daysDiff = Math.ceil((taskDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
+    if (daysDiff === 1) return <span style={{color:'var(--ink-light)'}}>• Expira amanhã {t.endTime ? `às ${t.endTime}` : ''}</span>;
+    if (daysDiff > 1) return <span style={{color:'var(--ink-light)'}}>• Expira em {daysDiff} dias</span>;
     return null;
   };
 
@@ -320,10 +436,10 @@ export default function Home() {
           <div className="task-meta">
             <div className="task-project-dot" style={{background: t.priority === 'high' ? 'var(--coral)' : t.priority === 'medium' ? 'var(--amber)' : 'var(--green)'}}></div>
             <span>{t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Média' : 'Baixa'}</span>
-            {t.time && <span>· {t.time}</span>}
+            {t.startTime && <span>• {t.startTime} - {t.endTime}</span>}
             {t.routineName && <span>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
             {t.projectId && <span>· <Icons.Folder size={12} style={{display:'inline',marginBottom:'-2px'}}/> {projects.find((p:any)=>p.id===t.projectId)?.name || 'Projeto'}</span>}
-            {locked && <span style={{color:'var(--ink-light)'}}>· 🔒 Futuro</span>}
+            {locked && <span style={{color:'var(--ink-light)'}}>• Futuro</span>}
             {overdue && <span style={{color:'var(--coral)', fontWeight:'600'}}>· ⚠️ Atrasada ({new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>}
             {expirationText}
           </div>
@@ -359,6 +475,20 @@ export default function Home() {
     );
   };
 
+  if (status === "loading" && activeScreen === "app") {
+    return (
+      <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--cream)', color:'var(--ink)'}}>
+        <style>{`
+          @keyframes spin { 100% { transform: rotate(360deg); } }
+          .animate-spin { animation: spin 1s linear infinite; }
+        `}</style>
+        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px', color:'var(--coral)'}} />
+        <h2 style={{fontSize:'18px', fontWeight:'600'}}>Acessando sua conta...</h2>
+        <p style={{fontSize:'13px', color:'var(--ink-light)', marginTop:'8px'}}>Aguarde um momento</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="toast" id="toast">
@@ -370,7 +500,7 @@ export default function Home() {
       {successToast && (
         <div style={{
           position:'fixed',top:'24px',left:'50%',transform:'translateX(-50%)',zIndex:9999,
-          background: successToast.startsWith('🎉') ? '#3D7A5E' : 'var(--ink)',
+          background: (successToast.toLowerCase().includes('erro') || successToast.toLowerCase().includes('restrito')) ? 'var(--coral)' : '#3D7A5E',
           color:'white',padding:'14px 28px',borderRadius:'100px',fontSize:'14px',
           fontWeight:'600',boxShadow:'0 8px 32px rgba(0,0,0,0.18)',display:'flex',
           alignItems:'center',gap:'10px',whiteSpace:'nowrap'
@@ -690,11 +820,12 @@ export default function Home() {
                     <div className="pricing-price">R$0</div>
                     <div className="pricing-period">para sempre</div>
                     <ul className="pricing-features">
-                        <li>Até 50 tarefas ativas</li>
-                        <li>2 projetos</li>
-                        <li>1 rotina automática</li>
-                        <li>Lembretes básicos</li>
-                        <li>Web + mobile</li>
+                        <li>✅ Tarefas ilimitadas</li>
+                        <li>✅ Projetos ilimitados</li>
+                        <li>✅ Rotinas ilimitadas</li>
+                        <li>✅ Lista de compras ilimitada</li>
+                        <li>✅ Horários nas tarefas</li>
+                        <li>✅ Web + mobile</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Começar grátis</button>
                 </div>
@@ -704,11 +835,12 @@ export default function Home() {
                     <div className="pricing-price">R$29<span style={{fontSize:'24px',fontWeight:500}}>,90</span></div>
                     <div className="pricing-period" style={{"color":"rgba(255,255,255,0.5)"}}>por mês</div>
                     <ul className="pricing-features">
-                        <li>Tarefas ilimitadas</li>
-                        <li>Projetos ilimitados</li>
-                        <li>Rotinas ilimitadas</li>
+                        <li>✅ Tudo do plano Gratuito</li>
                         <li>Dashboard avançado</li>
-                        <li>Compartilhar com até 3 pessoas</li>
+                        <li>Relatórios de produtividade</li>
+                        <li>Compartilhar projetos (até 3)</li>
+                        <li>Suporte prioritário</li>
+                        <li>🤖 IA Assistente (em breve)</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Assinar Pro</button>
                 </div>
@@ -717,10 +849,12 @@ export default function Home() {
                     <div className="pricing-price">R$59<span style={{fontSize:'24px',fontWeight:500}}>,90</span></div>
                     <div className="pricing-period">/mês (até 5 pessoas)</div>
                     <ul className="pricing-features">
-                        <li>Tudo do plano Pro</li>
-                        <li>Até 5 usuários inclusos</li>
-                        <li>Projetos compartilhados em equipe</li>
-                        <li>Dashboard mais avançado que o Pro</li>
+                        <li>✅ Tudo do plano Pro</li>
+                        <li>🏢 Até 5 usuários inclusos</li>
+                        <li>🏢 Projetos compartilhados em equipe</li>
+                        <li>🏢 Dashboard executivo</li>
+                        <li>🤖 IA Assistente (acesso antecipado)</li>
+                        <li>📞 Suporte dedicado</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Começar com o time</button>
                 </div>
@@ -1057,10 +1191,42 @@ export default function Home() {
                         <Icons.Calendar size={18} className="sidebar-item-icon" />
                         {t('thisWeek', lang)}
                     </div>
+                    <div className={`sidebar-item ${activeTab === 'Minhas Tarefas' ? 'active' : ''}`} onClick={() => setActiveTab('Minhas Tarefas')}>
+                        <Icons.ListTodo size={18} className="sidebar-item-icon" />
+                        Minhas Tarefas
+                        <span className="sidebar-item-count" style={{background:'var(--ink)'}}>{tasks.length}</span>
+                    </div>
+                    <div className={`sidebar-item ${activeTab === 'Lista de Compras' ? 'active' : ''}`} onClick={() => setActiveTab('Lista de Compras')}>
+                        <Icons.ShoppingCart size={18} className="sidebar-item-icon" />
+                        Lista de Compras
+                        {shoppingLists.length > 0 && <span className="sidebar-item-count" style={{background:'var(--green)'}}>{shoppingLists.reduce((acc: number, l: any) => acc + (l.items?.filter((i: any) => !i.purchased).length ?? 0), 0)}</span>}
+                    </div>
                     <div className={`sidebar-item ${activeTab === 'Rotinas' ? 'active' : ''}`} onClick={() => setActiveTab('Rotinas')}>
                         <Icons.Clock size={18} className="sidebar-item-icon" />
                         {t('routines', lang)}
                     </div>
+                    <div className={`sidebar-item ${activeTab === 'Equipes' ? 'active' : ''}`} onClick={() => {
+                        if (currentUserData?.plan === 'FREE') {
+                            setSuccessToast('Acesso restrito. Equipes exigem o Plano Pro ou Premium.');
+                            setTimeout(() => setSuccessToast(''), 4000);
+                            return;
+                        }
+                        setActiveTab('Equipes');
+                    }}>
+                        <Icons.Users size={18} className="sidebar-item-icon" />
+                        Equipes
+                        {currentUserData?.plan === 'FREE' && <Icons.Lock size={12} color="var(--ink-light)" style={{marginLeft:'auto'}} />}
+                        {currentUserData?.plan !== 'FREE' && myInvitations.length > 0 && (
+                            <span style={{marginLeft:'auto', background:'var(--coral)', color:'white', fontSize:'10px', fontWeight:'700', borderRadius:'10px', padding:'1px 6px', minWidth:'16px', textAlign:'center'}}>{myInvitations.length}</span>
+                        )}
+                    </div>
+                    {/* Invitations bell — shown when not on Equipes tab */}
+                    {currentUserData?.plan !== 'FREE' && myInvitations.length > 0 && activeTab !== 'Equipes' && (
+                        <div style={{margin:'4px 12px', padding:'10px 14px', borderRadius:'12px', background:'rgba(232,80,58,0.06)', border:'1.5px solid rgba(232,80,58,0.2)', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px'}} onClick={() => setIsInvitationsModalOpen(true)}>
+                            <Icons.Bell size={15} color="var(--coral)" style={{flexShrink:0}}/>
+                            <span style={{fontSize:'12px', fontWeight:'600', color:'var(--coral)'}}>{myInvitations.length} convite{myInvitations.length>1?'s':''} pendente{myInvitations.length>1?'s':''}</span>
+                        </div>
+                    )}
                     <div className={`sidebar-item ${activeTab === 'Concluídas' ? 'active' : ''}`} onClick={() => setActiveTab('Concluídas')}>
                         <Icons.CheckCircle size={18} className="sidebar-item-icon" />
                         {t('completed', lang)}
@@ -1189,15 +1355,9 @@ export default function Home() {
                         <button className="app-add-btn" onClick={() => openTaskModal({ date: selectedWeekDate || new Date().toISOString().split('T')[0] })}><Icons.Calendar size={16} style={{display:'inline',marginBottom:'-3px'}}/> Dia selecionado</button>
                     )}
                     {activeTab === 'Rotinas' && (
-                        <button className="app-add-btn" onClick={() => {
-                            if (currentUserData?.plan === 'FREE' && routines.length >= 1) {
-                                setSuccessToast('⚠️ Plano Gratuito: máx 1 rotina. Faça upgrade para criar rotinas ilimitadas!');
-                                setTimeout(() => setSuccessToast(''), 4000);
-                                setActiveTab('Planos');
-                            } else {
-                                setIsRoutineModalOpen(true);
-                            }
-                        }}><Icons.Plus size={16} style={{display:'inline',marginBottom:'-3px'}}/> Nova rotina</button>
+                        <button className="app-add-btn" onClick={() => setIsRoutineModalOpen(true)}>
+                            <Icons.Plus size={16} style={{display:'inline',marginBottom:'-3px'}}/> Nova rotina
+                        </button>
                     )}
                     {activeTab === 'Concluídas' && (
                         <></>
@@ -1241,7 +1401,7 @@ export default function Home() {
                             const greetKey = hour < 12 ? 'goodMorning' : hour < 18 ? 'goodAfternoon' : 'goodEvening';
                             const greeting = `${t(greetKey, lang)}${name ? `, ${name}` : ''}!`;
 
-                            const overdueTasks = tasks.filter(t => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < todayStr);
+                            const overdueTasks = tasks.filter(t => !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < todayStr);
                             const todayTasks = tasks.filter(t => !t.isDone && (!t.date || new Date(t.date).toISOString().split('T')[0] === todayStr));
                             const importantPending = tasks.filter(t => !t.isDone && t.priority === 'high' && (!t.date || new Date(t.date).toISOString().split('T')[0] <= todayStr));
                             const allPending = tasks.filter(t => !t.isDone && (!t.date || new Date(t.date).toISOString().split('T')[0] <= todayStr));
@@ -1338,7 +1498,7 @@ export default function Home() {
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))',gap:'16px'}}>
                             {tasks.filter(t => !t.isDone && !t.projectId).map(t => {
-                                const isOverdue = !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
+                                const isOverdue = !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
                                 return (
                                 <div key={t.id} style={{background: 'var(--white)', padding: '20px', borderRadius: '16px', border: '1px solid var(--cream-dark)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden'}}>
                                     <div style={{position:'absolute',top:0,left:0,bottom:0,width:'4px',background: t.priority==='high'?'var(--coral)':t.priority==='medium'?'var(--amber)':'var(--green)'}}></div>
@@ -1357,8 +1517,9 @@ export default function Home() {
                                     <div style={{fontSize:'12px',color:'var(--ink-light)',display:'flex',flexWrap:'wrap',gap:'12px',alignItems:'center'}}>
                                         {isOverdue && <span style={{display:'flex',alignItems:'center',gap:'4px',color:'var(--coral)',fontWeight:'600'}}><Icons.AlertCircle size={12} strokeWidth={2} /> Atrasada</span>}
                                         {t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.routineName}</span>}
-                                        {t.date && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> {new Date(t.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span>}
-                                        {t.time && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Hourglass size={12} color="var(--ink-mid)" /> {t.time}</span>}
+                                        {t.date && !t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> {new Date(t.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span>}
+                                        {t.routineName && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Calendar size={12} color="var(--ink-mid)" /> Hoje</span>}
+                                        {t.startTime && <span style={{display:'flex',alignItems:'center',gap:'4px'}}><Icons.Clock size={12} color="var(--ink-mid)" /> {t.startTime} - {t.endTime}</span>}
                                     </div>
                                 </div>
                             )})}
@@ -1395,20 +1556,8 @@ export default function Home() {
                                         setSuccessToast('Plano FREE não possui compartilhamento avançado. Faça upgrade!');
                                         return;
                                     }
-                                    const email = window.prompt("Digite o email do colega de trabalho:");
-                                    if (!email) return;
-                                    try {
-                                        const res = await inviteUserToProject(activeTab.replace('proj-',''), email);
-                                        if (res.success) {
-                                            setSuccessToast('Usuário adicionado com sucesso!');
-                                            const p = await getProjects();
-                                            setProjects(p);
-                                        }
-                                    } catch (e: any) {
-                                        setSuccessToast(`Erro: ${e.message}`);
-                                    }
+                                    setShareProjectId(activeTab.replace('proj-',''));
                                 }} style={{background:'white', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', borderRadius:'10px', padding:'6px 14px', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>+ Compartilhar</button>
-                                <button style={{cursor:'pointer', background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'7px 14px', fontSize:'13px', fontWeight:'600'}} onClick={() => openTaskModal({ projectId: activeTab.replace('proj-','') })}>Criar Tarefa</button>
                             </div>
                         </div>
                         <div className="task-list">
@@ -1553,6 +1702,212 @@ export default function Home() {
                 )}
 
                 {/* ---- DASHBOARD ---- */}
+                {/* ---- EQUIPES ---- */}
+                {activeTab === 'Equipes' && (() => {
+                    const myMembership = selectedTeamId && teamDetails ? teamDetails.members?.find((m:any) => m.userId === currentUserData?.id) : null;
+                    const canInvite = myMembership && ['OWNER','VICE_OWNER'].includes(myMembership.role);
+                    const canAssign = myMembership && ['OWNER','VICE_OWNER','SUPERVISOR'].includes(myMembership.role);
+                    const isOwner = myMembership?.role === 'OWNER';
+                    const ROLE_LABELS: any = { OWNER: 'Anfitrião', VICE_OWNER: 'Vice-Anfitrião', SUPERVISOR: 'Supervisor', WORKER: 'Trabalhador' };
+                    return (
+                    <div style={{display:'flex', gap:'20px', height:'calc(100vh - 120px)'}}>
+                        {/* LEFT: Team list */}
+                        <div style={{width:'280px', background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+                            <div style={{padding:'16px 20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <span style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)'}}>Minhas Equipes</span>
+                                <button onClick={() => setIsCreateTeamModalOpen(true)} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'7px 12px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px'}}><Icons.Plus size={14}/>Criar</button>
+                            </div>
+                            <div style={{flex:1, overflowY:'auto', padding:'12px'}}>
+                                {teams.length === 0 ? (
+                                    <div style={{textAlign:'center', padding:'40px 12px', color:'var(--ink-faint)'}}>
+                                        <Icons.Users size={36} strokeWidth={1} style={{marginBottom:'10px', color:'var(--ink-light)'}}/>
+                                        <p style={{fontSize:'13px'}}>Nenhuma equipe ainda.</p>
+                                    </div>
+                                ) : teams.map((team:any) => (
+                                    <div key={team.id} onClick={async () => {
+                                        setSelectedTeamId(team.id);
+                                        setTeamActiveTab('chat');
+                                        setIsTeamDetailLoading(true);
+                                        const [det, st] = await Promise.all([getTeamDetails(team.id), getTeamStats(team.id)]);
+                                        setTeamDetails(det);
+                                        setTeamStats(st);
+                                        setIsTeamDetailLoading(false);
+                                    }} style={{padding:'14px', borderRadius:'14px', border:`2px solid ${selectedTeamId===team.id?'var(--coral)':'var(--cream-dark)'}`, marginBottom:'8px', cursor:'pointer', transition:'all 0.2s', background: selectedTeamId===team.id?'rgba(232,80,58,0.04)':'transparent'}}>
+                                        <div style={{fontWeight:'600', fontSize:'14px', color:'var(--ink)', marginBottom:'4px'}}>{team.name}</div>
+                                        <div style={{fontSize:'12px', color:'var(--ink-light)', display:'flex', alignItems:'center', gap:'4px'}}>
+                                            <Icons.Users size={11}/> {team.members?.length || 0} membros
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* RIGHT: Team detail */}
+                        <div style={{flex:1, background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+                            {!selectedTeamId ? (
+                                <div style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'var(--ink-faint)', gap:'12px'}}>
+                                    <Icons.Users size={48} strokeWidth={1} style={{color:'var(--ink-light)'}}/>
+                                    <p style={{fontSize:'15px', color:'var(--ink-mid)'}}>Selecione uma equipe para começar</p>
+                                </div>
+                            ) : isTeamDetailLoading ? (
+                                <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                                    <Icons.Loader2 size={32} style={{animation:'spin 1s linear infinite', color:'var(--coral)'}}/>
+                                </div>
+                            ) : teamDetails ? (
+                                <>
+                                    {/* Header */}
+                                    <div style={{padding:'16px 20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                        <div>
+                                            <h2 style={{fontSize:'17px', fontWeight:'700', color:'var(--ink)', margin:0}}>{teamDetails.name}</h2>
+                                            <p style={{fontSize:'12px', color:'var(--ink-light)', margin:'2px 0 0'}}>{teamDetails.description || 'Sem descrição'} · {teamDetails.members?.length} membros</p>
+                                        </div>
+                                        <div style={{display:'flex', gap:'8px'}}>
+                                            {canInvite && <button onClick={() => setIsInviteModalOpen(true)} style={{background:'var(--cream)', color:'var(--ink)', border:'none', borderRadius:'10px', padding:'8px 14px', fontSize:'13px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px'}}><Icons.UserPlus size={14}/>Convidar</button>}
+                                            {canAssign && <button onClick={() => setIsAssignTaskModalOpen(true)} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'8px 14px', fontSize:'13px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px'}}><Icons.ListPlus size={14}/>Atribuir Tarefa</button>}
+                                        </div>
+                                    </div>
+                                    {/* Inner tabs */}
+                                    <div style={{display:'flex', borderBottom:'1px solid var(--cream-dark)', padding:'0 20px'}}>
+                                        {(['chat','tasks','members','stats'] as const).map(tab => {
+                                            const labels: any = {chat:'Chat', tasks:'Tarefas', members:'Membros', stats:'Estatísticas'};
+                                            return <button key={tab} onClick={() => setTeamActiveTab(tab)} style={{padding:'12px 16px', border:'none', background:'transparent', borderBottom: teamActiveTab===tab?'2px solid var(--coral)':'2px solid transparent', color: teamActiveTab===tab?'var(--coral)':'var(--ink-mid)', fontWeight: teamActiveTab===tab?'700':'500', fontSize:'13px', cursor:'pointer', transition:'all 0.2s'}}>{labels[tab]}</button>
+                                        })}
+                                    </div>
+                                    {/* Tab content */}
+                                    <div style={{flex:1, overflowY:'auto', padding:'20px'}}>
+                                        {/* CHAT */}
+                                        {teamActiveTab === 'chat' && (
+                                            <div style={{display:'flex', flexDirection:'column', height:'100%', gap:'12px'}}>
+                                                <div style={{flex:1, display:'flex', flexDirection:'column', gap:'10px', overflowY:'auto'}}>
+                                                    {(teamDetails.messages || []).length === 0 && <div style={{textAlign:'center', color:'var(--ink-faint)', paddingTop:'40px', fontSize:'13px'}}>Nenhuma mensagem ainda. Seja o primeiro!</div>}
+                                                    {(teamDetails.messages || []).map((msg:any) => {
+                                                        const isMe = msg.userId === currentUserData?.id;
+                                                        return (
+                                                            <div key={msg.id} style={{display:'flex', flexDirection: isMe?'row-reverse':'row', gap:'10px', alignItems:'flex-end'}}>
+                                                                {msg.user.image ? <img src={msg.user.image} style={{width:'32px', height:'32px', borderRadius:'50%', flexShrink:0}}/> : <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'700', flexShrink:0}}>{msg.user.name?.charAt(0)||'?'}</div>}
+                                                                <div style={{maxWidth:'65%'}}>
+                                                                    {!isMe && <div style={{fontSize:'11px', color:'var(--ink-light)', marginBottom:'3px'}}>{msg.user.name}</div>}
+                                                                    <div style={{padding:'10px 14px', borderRadius: isMe?'16px 4px 16px 16px':'4px 16px 16px 16px', background: isMe?'var(--coral)':'var(--cream)', color: isMe?'white':'var(--ink)', fontSize:'14px', lineHeight:'1.4'}}>{msg.content}</div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div style={{display:'flex', gap:'10px', paddingTop:'12px', borderTop:'1px solid var(--cream-dark)'}}>
+                                                    <input value={teamChatInput} onChange={e => setTeamChatInput(e.target.value)} onKeyDown={async e => { if(e.key==='Enter' && teamChatInput.trim()) { await sendTeamMessage(selectedTeamId!, teamChatInput.trim()); setTeamChatInput(''); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }}} placeholder="Escreva uma mensagem..." style={{flex:1, padding:'12px 16px', borderRadius:'12px', border:'1.5px solid var(--cream-dark)', fontSize:'14px', background:'var(--cream)', outline:'none'}}/>
+                                                    <button onClick={async () => { if(!teamChatInput.trim()) return; await sendTeamMessage(selectedTeamId!, teamChatInput.trim()); setTeamChatInput(''); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'12px', padding:'0 18px', cursor:'pointer'}}><Icons.Send size={16}/></button>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* TASKS */}
+                                        {teamActiveTab === 'tasks' && (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                                {(teamDetails.tasks || []).length === 0 && <div style={{textAlign:'center', color:'var(--ink-faint)', paddingTop:'40px', fontSize:'13px'}}>Nenhuma tarefa atribuída ainda.</div>}
+                                                {(teamDetails.tasks || []).map((task:any) => {
+                                                    const assignee = teamDetails.members?.find((m:any) => m.userId === task.assignedToId);
+                                                    return (
+                                                        <div key={task.id} style={{padding:'14px 16px', borderRadius:'14px', border:'1.5px solid var(--cream-dark)', background:'var(--cream)', display:'flex', alignItems:'center', gap:'14px'}}>
+                                                            <div style={{width:'10px', height:'10px', borderRadius:'50%', background: task.priority==='high'?'var(--coral)':task.priority==='medium'?'var(--amber)':'var(--green)', flexShrink:0}}/>
+                                                            <div style={{flex:1}}>
+                                                                <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)', textDecoration: task.isDone?'line-through':'none'}}>{task.title}</div>
+                                                                {assignee && <div style={{fontSize:'12px', color:'var(--ink-light)', marginTop:'3px'}}>Para: {assignee.user.name}</div>}
+                                                            </div>
+                                                            <div style={{fontSize:'11px', fontWeight:'700', padding:'3px 8px', borderRadius:'8px', background: task.isDone?'rgba(34,197,94,0.1)':'rgba(232,80,58,0.1)', color: task.isDone?'var(--green)':'var(--coral)'}}>{task.isDone?'Concluída':'Pendente'}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {/* MEMBERS */}
+                                        {teamActiveTab === 'members' && (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                                {/* Pending invitations */}
+                                                {(teamDetails.invitations || []).length > 0 && (
+                                                    <div style={{padding:'14px', borderRadius:'14px', border:'1.5px dashed var(--amber)', background:'rgba(245,158,11,0.05)', marginBottom:'8px'}}>
+                                                        <div style={{fontSize:'12px', fontWeight:'700', color:'var(--amber)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'5px'}}><Icons.Clock size={13}/>Convites pendentes</div>
+                                                        {(teamDetails.invitations||[]).map((inv:any) => (
+                                                            <div key={inv.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'13px', color:'var(--ink)', padding:'6px 0', borderBottom:'1px solid var(--cream-dark)'}}>
+                                                                <span>{inv.email} <span style={{color:'var(--ink-light)', fontSize:'11px'}}>· {ROLE_LABELS[inv.role]}</span></span>
+                                                                {isOwner && <button onClick={async () => { await cancelInvitation(inv.id); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} style={{background:'none', border:'none', cursor:'pointer', color:'var(--coral)', fontSize:'12px', fontWeight:'600'}}>Cancelar</button>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {(teamDetails.members || []).map((m:any) => (
+                                                    <div key={m.id} style={{display:'flex', alignItems:'center', gap:'14px', padding:'14px 16px', borderRadius:'14px', border:'1.5px solid var(--cream-dark)', background:'var(--cream)'}}>
+                                                        {m.user.image ? <img src={m.user.image} style={{width:'40px', height:'40px', borderRadius:'50%', flexShrink:0}}/> : <div style={{width:'40px', height:'40px', borderRadius:'50%', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', fontSize:'15px', flexShrink:0}}>{m.user.name?.charAt(0)||'?'}</div>}
+                                                        <div style={{flex:1}}>
+                                                            <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{m.user.name}</div>
+                                                            <div style={{fontSize:'12px', color:'var(--ink-light)'}}>{m.user.email}</div>
+                                                        </div>
+                                                        <span style={{fontSize:'11px', fontWeight:'700', padding:'4px 10px', borderRadius:'20px', background: m.role==='OWNER'?'rgba(232,80,58,0.1)':m.role==='VICE_OWNER'?'rgba(99,102,241,0.1)':m.role==='SUPERVISOR'?'rgba(245,158,11,0.1)':'rgba(34,197,94,0.1)', color: m.role==='OWNER'?'var(--coral)':m.role==='VICE_OWNER'?'#6366f1':m.role==='SUPERVISOR'?'var(--amber)':'var(--green)'}}>{ROLE_LABELS[m.role]||m.role}</span>
+                                                        {isOwner && m.userId !== currentUserData?.id && (
+                                                            <div style={{display:'flex', gap:'4px'}}>
+                                                                <select onChange={async e => { if(!e.target.value) return; await updateMemberRole(selectedTeamId!, m.userId, e.target.value); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} defaultValue="" style={{fontSize:'11px', border:'1.5px solid var(--cream-dark)', borderRadius:'8px', padding:'4px 6px', background:'var(--white)', cursor:'pointer'}}>
+                                                                    <option value="" disabled>Cargo</option>
+                                                                    <option value="VICE_OWNER">Vice-Anfitrião</option>
+                                                                    <option value="SUPERVISOR">Supervisor</option>
+                                                                    <option value="WORKER">Trabalhador</option>
+                                                                </select>
+                                                                <button onClick={async () => { await removeMember(selectedTeamId!, m.userId); const det = await getTeamDetails(selectedTeamId!); setTeamDetails(det); }} style={{background:'rgba(232,80,58,0.1)', border:'none', borderRadius:'8px', padding:'4px 8px', cursor:'pointer', color:'var(--coral)'}}><Icons.UserX size={13}/></button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {isOwner && <button onClick={async () => { await deleteTeam(selectedTeamId!); setSelectedTeamId(null); setTeamDetails(null); const tms = await getTeams(); setTeams(tms); setSuccessToast('Equipe excluida.'); setTimeout(()=>setSuccessToast(''),3000); }} style={{marginTop:'16px', background:'rgba(232,80,58,0.1)', color:'var(--coral)', border:'1.5px solid rgba(232,80,58,0.2)', borderRadius:'12px', padding:'10px', fontSize:'13px', fontWeight:'600', cursor:'pointer', width:'100%'}}>Excluir Equipe</button>}
+                                            </div>
+                                        )}
+                                        {/* STATS */}
+                                        {teamActiveTab === 'stats' && (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+                                                {!teamStats || teamStats.length === 0 ? <div style={{textAlign:'center', color:'var(--ink-faint)', paddingTop:'40px', fontSize:'13px'}}>Nenhuma estatística disponível.</div> : teamStats.map((s:any) => (
+                                                    <div key={s.userId} style={{padding:'20px', borderRadius:'16px', border:'1.5px solid var(--cream-dark)', background:'var(--cream)'}}>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
+                                                            {s.image ? <img src={s.image} style={{width:'44px', height:'44px', borderRadius:'50%'}}/> : <div style={{width:'44px', height:'44px', borderRadius:'50%', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', fontSize:'16px'}}>{s.name?.charAt(0)||'?'}</div>}
+                                                            <div>
+                                                                <div style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)'}}>{s.name}</div>
+                                                                <div style={{fontSize:'12px', color:'var(--ink-light)'}}>{ROLE_LABELS[s.role]||s.role}</div>
+                                                            </div>
+                                                            <div style={{marginLeft:'auto', fontSize:'28px', fontWeight:'800', color: s.rate===100?'var(--green)':s.rate>=50?'var(--amber)':'var(--coral)', fontFamily:"'Fraunces',serif"}}>{s.rate}%</div>
+                                                        </div>
+                                                        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px', marginBottom:'16px'}}>
+                                                            {[{label:'Total', val:s.total, color:'var(--ink)'},{label:'Concluídas', val:s.done, color:'var(--green)'},{label:'Pendentes', val:s.pending, color:'var(--coral)'}].map(({label,val,color}) => (
+                                                                <div key={label} style={{textAlign:'center', padding:'10px', borderRadius:'12px', background:'var(--white)'}}>
+                                                                    <div style={{fontSize:'22px', fontWeight:'800', color, fontFamily:"'Fraunces',serif"}}>{val}</div>
+                                                                    <div style={{fontSize:'11px', color:'var(--ink-light)'}}>{label}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div style={{marginBottom:'8px'}}>
+                                                            <div style={{fontSize:'11px', color:'var(--ink-light)', marginBottom:'6px'}}>Taxa de conclusão</div>
+                                                            <div style={{height:'8px', background:'var(--white)', borderRadius:'4px', overflow:'hidden'}}>
+                                                                <div style={{height:'100%', width:`${s.rate}%`, background: s.rate===100?'var(--green)':s.rate>=50?'var(--amber)':'var(--coral)', borderRadius:'4px', transition:'width 0.4s'}}/>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{fontSize:'11px', color:'var(--ink-light)', marginBottom:'6px'}}>Tarefas concluídas por dia</div>
+                                                            <div style={{display:'flex', gap:'4px', alignItems:'flex-end', height:'40px'}}>
+                                                                {['D','S','T','Q','Q','S','S'].map((d,i) => {
+                                                                    const max = Math.max(...(s.byDay||[1]), 1);
+                                                                    const h = s.byDay?.[i] ? Math.max(4, Math.round((s.byDay[i]/max)*36)) : 4;
+                                                                    return <div key={i} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'3px'}}>
+                                                                        <div style={{width:'100%', height:`${h}px`, background: s.byDay?.[i]?'var(--coral)':'var(--cream-dark)', borderRadius:'3px', transition:'height 0.3s'}}/>
+                                                                        <div style={{fontSize:'9px', color:'var(--ink-faint)'}}>{d}</div>
+                                                                    </div>;
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : null}
+                        </div>
+                    </div>
+                    );
+                })()}
                 {activeTab === 'Dashboard' && (
                     <>
                         {currentUserData?.plan === 'FREE' ? (
@@ -1599,6 +1954,38 @@ export default function Home() {
                         </div>
                         <div className="section-header" style={{marginTop:'8px'}}><h2>Distribuição por prioridade</h2></div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'24px'}}>
+                        {teams.length > 0 && (
+                            <div style={{marginTop:'32px'}}>
+                                <div className="section-header"><h2>Performance da Equipe</h2></div>
+                                <div style={{background:'var(--white)', borderRadius:'16px', border:'1px solid var(--cream-dark)', overflow:'hidden'}}>
+                                    {teams.map(team => (
+                                        <div key={team.id} style={{padding:'20px', borderBottom:'1px solid var(--cream-dark)'}}>
+                                            <h4 style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)', margin:'0 0 16px 0', display:'flex', alignItems:'center', gap:'8px'}}><Icons.Users size={16} color="var(--coral)"/> {team.name}</h4>
+                                            <div style={{display:'grid', gap:'12px'}}>
+                                                {team.members.map((m:any) => {
+                                                    const memberTasks = tasks.filter(t => t.userId === m.userId && (t.projectId || t.teamId === team.id));
+                                                    const doneMember = memberTasks.filter(t => t.isDone).length;
+                                                    const pctMember = memberTasks.length > 0 ? Math.round((doneMember / memberTasks.length) * 100) : 0;
+                                                    return (
+                                                        <div key={m.id} style={{display:'flex', alignItems:'center', gap:'16px', padding:'12px', background:'var(--cream)', borderRadius:'12px'}}>
+                                                            {m.user.image ? <img src={m.user.image} style={{width:'40px', height:'40px', borderRadius:'20px'}} /> : <div style={{width:'40px', height:'40px', borderRadius:'20px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', fontSize:'14px'}}>{m.user.name?.charAt(0)?.toUpperCase() || '?'}</div>}
+                                                            <div style={{flex:1}}>
+                                                                <div style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{m.user.name} <span style={{fontSize:'11px', fontWeight:'500', background:'var(--white)', padding:'2px 6px', borderRadius:'8px', color:'var(--ink-light)', marginLeft:'8px'}}>{m.role === 'ADMIN' ? 'Lder' : 'Membro'}</span></div>
+                                                                <div style={{fontSize:'12px', color:'var(--ink-mid)', marginTop:'4px'}}>{doneMember} de {memberTasks.length} tarefas concludas</div>
+                                                                <div style={{height:'6px', background:'var(--white)', borderRadius:'3px', marginTop:'6px', overflow:'hidden'}}>
+                                                                    <div style={{height:'100%', width:`${pctMember}%`, background: pctMember === 100 ? 'var(--green)' : 'var(--blue)', transition:'width 0.3s'}}></div>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{fontSize:'20px', fontWeight:'700', color: pctMember === 100 ? 'var(--green)' : 'var(--ink)'}}>{pctMember}%</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                             {([{label:'Alta',color:'var(--coral)',key:'high'},{label:'Média',color:'var(--amber)',key:'medium'},{label:'Baixa',color:'var(--green)',key:'low'}] as {label:string,color:string,key:string}[]).map(({label,color,key}) => (
                                 <div key={label} style={{background:'var(--cream)',borderRadius:'16px',padding:'20px',textAlign:'center'}}>
                                     <div style={{fontSize:'28px',fontWeight:'700',color,fontFamily:"'Fraunces',serif"}}>{tasks.filter(t=>t.priority===key).length}</div>
@@ -1965,32 +2352,50 @@ export default function Home() {
                             Faça o upgrade para desbloquear todos os recursos avançados, projetos ilimitados e integração com outras ferramentas.
                         </p>
 
+                        <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'12px', marginBottom:'40px'}}>
+                            <span style={{fontSize:'14px', fontWeight:'600', color: !billingAnnual ? 'var(--ink)' : 'var(--ink-light)'}}>Mensal</span>
+                            <div className="toggle-switch" onClick={() => setBillingAnnual(!billingAnnual)} style={{width:'50px', height:'28px', background: billingAnnual ? 'var(--coral)' : 'var(--ink-light)', borderRadius:'20px', position:'relative', cursor:'pointer'}}>
+                                <div style={{width:'22px', height:'22px', background:'var(--white)', borderRadius:'50%', position:'absolute', top:'3px', left: billingAnnual ? '25px' : '3px', transition:'all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}></div>
+                            </div>
+                            <span style={{fontSize:'14px', fontWeight:'600', color: billingAnnual ? 'var(--ink)' : 'var(--ink-light)'}}>Anual <span style={{fontSize:'11px', background:'rgba(61,122,94,0.1)', color:'var(--green)', padding:'2px 6px', borderRadius:'10px', marginLeft:'4px'}}>-20%</span></span>
+                        </div>
+
+                        <div style={{background:'rgba(232,80,58,0.05)', borderRadius:'16px', padding:'20px', marginBottom:'40px', border:'1px solid rgba(232,80,58,0.15)'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
+                                <Icons.CheckCircle size={20} color="var(--coral)" />
+                                <span style={{fontWeight:'700', color:'var(--ink)'}}>Nós valorizamos a sua liberdade.</span>
+                            </div>
+                            <p style={{fontSize:'14px', color:'var(--ink-mid)', margin:0, lineHeight:'1.5'}}>
+                                Nosso plano <strong>Free</strong> já oferece tudo o que você precisa para o dia a dia: <strong style={{color:'var(--ink)'}}>Tarefas ilimitadas, Projetos ilimitados, Rotinas e Listas de Compras pra sempre.</strong> Faça upgrade apenas se precisar de mais inteligência (Dashboard), time ou integrações empresariais.
+                            </p>
+                        </div>
+
                         <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:'24px', marginBottom:'40px'}}>
                             {/* Pro Plan */}
                             <div style={{background:'var(--white)', border:'1px solid var(--cream-dark)', borderRadius:'20px', padding:'32px', display:'flex', flexDirection:'column'}}>
                                 <div style={{fontSize:'18px', fontWeight:'700', color:'var(--ink)', marginBottom:'4px'}}>Pro</div>
                                 <div style={{fontSize:'14px', color:'var(--ink-light)', marginBottom:'20px'}}>Para acelerar seus resultados.</div>
-                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", color:'var(--ink)', marginBottom:'24px'}}>R$29<span style={{fontSize:'18px',fontWeight:500,color:'var(--ink-mid)'}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', color:'var(--ink-light)', fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", color:'var(--ink)', marginBottom: billingAnnual ? '4px' : '24px'}}>R${billingAnnual ? '23' : '29'}<span style={{fontSize:'18px',fontWeight:500,color:'var(--ink-mid)'}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', color:'var(--ink-light)', fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                {billingAnnual && <div style={{fontSize:'12px', color:'var(--ink-light)', fontWeight:'500', marginBottom:'20px'}}>Cobrado R$ 286,80 por ano</div>}
                                 
                                 <ul style={{listStyle:'none', padding:0, margin:'0 0 32px 0', flex:1, display:'flex', flexDirection:'column', gap:'12px'}}>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Tarefas ilimitadas</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Projetos ilimitados</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Rotinas ilimitadas</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Dashboard avançado</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Compartilhar com até 3 pessoas</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Tudo do plano Free</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Dashboard preditivo de performance</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Compartilhar projetos (até 3 pessoas)</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px', color:'var(--ink-mid)'}}><Icons.Check size={18} color="var(--coral)" style={{flexShrink:0}}/> Relatórios semanais por e-mail</li>
                                 </ul>
                                 <button onClick={async () => {
                                     const res = await fetch('/api/checkout', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ plan: 'PRO' })
+                                        body: JSON.stringify({ plan: 'PRO', billingAnnual })
                                     });
                                     if(res.ok) {
                                         const { url } = await res.json();
                                         window.location.href = url;
                                     } else {
                                         const errText = await res.text();
-                                        setSuccessToast('⚠️ Erro Stripe: ' + errText);
+                                        setSuccessToast('Erro Stripe: ' + errText);
                                         setTimeout(() => setSuccessToast(''), 4000);
                                     }
                                 }} style={{background:'var(--cream)', color:'var(--ink)', border:'1px solid var(--cream-dark)', borderRadius:'12px', padding:'14px', fontSize:'14px', fontWeight:'600', cursor:'pointer', width:'100%', transition:'background 0.2s', textAlign:'center'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--cream-dark)')} onMouseLeave={e=>(e.currentTarget.style.background='var(--cream)')}>Assinar Plano Pro</button>
@@ -2000,12 +2405,14 @@ export default function Home() {
                             <div style={{background:'var(--coral)', color:'white', borderRadius:'20px', padding:'32px', display:'flex', flexDirection:'column', position:'relative', boxShadow:'0 12px 32px rgba(232,80,58,0.2)'}}>
                                 <div style={{position:'absolute', top:'-12px', right:'32px', background:'var(--white)', color:'var(--coral)', fontSize:'11px', fontWeight:'700', padding:'6px 12px', borderRadius:'20px', textTransform:'uppercase', letterSpacing:'0.5px'}}>Mais Popular</div>
                                 <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'4px'}}>Premium</div>
-                                <div style={{fontSize:'14px', opacity:0.8, marginBottom:'20px'}}>Produtividade em equipe e AI.</div>
-                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", marginBottom:'24px'}}>R$59<span style={{fontSize:'18px',fontWeight:500,opacity:0.8}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', opacity:0.8, fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                <div style={{fontSize:'14px', opacity:0.8, marginBottom:'20px'}}>Inteligência Artificial & Times.</div>
+                                <div style={{fontSize:'36px', fontWeight:'800', fontFamily:"'Fraunces',serif", marginBottom: billingAnnual ? '4px' : '24px'}}>R${billingAnnual ? '47' : '59'}<span style={{fontSize:'18px',fontWeight:500,opacity:0.8}}>,90</span><span style={{fontSize:'14px', fontWeight:'500', opacity:0.8, fontFamily:"'DM Sans',sans-serif"}}>/mês</span></div>
+                                {billingAnnual && <div style={{fontSize:'12px', color:'rgba(255,255,255,0.7)', fontWeight:'500', marginBottom:'20px'}}>Cobrado R$ 574,80 por ano</div>}
                                 
                                 <ul style={{listStyle:'none', padding:0, margin:'0 0 32px 0', flex:1, display:'flex', flexDirection:'column', gap:'12px'}}>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Tudo do plano Pro</li>
-                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Até 5 usuários inclusos</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Compartilhamento ilimitado (Times)</li>
+                                    <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Inteligência Artificial em breve (Prototipo)</li>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Projetos compartilhados em equipe</li>
                                     <li style={{display:'flex', alignItems:'flex-start', gap:'10px', fontSize:'14px'}}><Icons.Check size={18} style={{flexShrink:0}}/> Dashboard mais avançado que o Pro</li>
                                 </ul>
@@ -2013,7 +2420,7 @@ export default function Home() {
                                     const res = await fetch('/api/checkout', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ plan: 'PREMIUM' })
+                                        body: JSON.stringify({ plan: 'PREMIUM', billingAnnual })
                                     });
                                     if(res.ok) {
                                         const { url } = await res.json();
@@ -2029,6 +2436,296 @@ export default function Home() {
 
                     </div>
                 )}
+                
+                {/* ---- MINHAS TAREFAS ---- */}
+                {activeTab === 'Minhas Tarefas' && (
+                    <div style={{maxWidth:'900px'}}>
+                        <div className="section-header">
+                            <h2>Minhas Tarefas</h2>
+                        </div>
+
+                        {/* Filters Bar */}
+                        <div style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'24px', alignItems:'center'}}>
+                            <div style={{flex:'1 1 220px', position:'relative'}}>
+                                <Icons.Search size={15} style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'var(--ink-faint)',pointerEvents:'none'}} />
+                                <input
+                                    style={{width:'100%',padding:'9px 12px 9px 34px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',outline:'none',boxSizing:'border-box'}}
+                                    placeholder="Buscar tarefas..."
+                                    value={taskSearch}
+                                    onChange={e => setTaskSearch(e.target.value)}
+                                />
+                            </div>
+                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterStatus} onChange={e => setTaskFilterStatus(e.target.value as any)}>
+                                <option value="all">Todas</option>
+                                <option value="pending">Pendentes</option>
+                                <option value="done">Concluídas</option>
+                            </select>
+                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterPriority} onChange={e => setTaskFilterPriority(e.target.value as any)}>
+                                <option value="all">Todas prioridades</option>
+                                <option value="high">Alta</option>
+                                <option value="medium">Média</option>
+                                <option value="low">Baixa</option>
+                            </select>
+                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}>
+                                <option value="all">Todos projetos</option>
+                                <option value="none">Sem projeto</option>
+                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            {bulkSelected.length > 0 && (
+                                <button
+                                    onClick={async () => {
+                                        for (const id of bulkSelected) { await deleteTask(id); }
+                                        const fresh = await getTasks();
+                                        setTasks(fresh);
+                                        setBulkSelected([]);
+                                        setSuccessToast(`🗑️ ${bulkSelected.length} tarefa(s) excluída(s).`);
+                                        setTimeout(() => setSuccessToast(''), 3000);
+                                    }}
+                                    style={{padding:'9px 16px',background:'rgba(232,80,58,0.1)',border:'1.5px solid rgba(232,80,58,0.2)',borderRadius:'10px',fontSize:'13px',fontWeight:'600',color:'var(--coral)',cursor:'pointer'}}
+                                >
+                                    <Icons.Trash2 size={14} style={{display:'inline',marginBottom:'-2px',marginRight:'5px'}} />
+                                    Excluir {bulkSelected.length}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Task list */}
+                        {(() => {
+                            const filtered = tasks.filter((tk: any) => {
+                                const matchSearch = !taskSearch || tk.title.toLowerCase().includes(taskSearch.toLowerCase());
+                                const matchStatus = taskFilterStatus === 'all' || (taskFilterStatus === 'done' ? tk.isDone : !tk.isDone);
+                                const matchPriority = taskFilterPriority === 'all' || tk.priority === taskFilterPriority;
+                                const matchProject = taskFilterProject === 'all' || (taskFilterProject === 'none' ? !tk.projectId : tk.projectId === taskFilterProject);
+                                return matchSearch && matchStatus && matchPriority && matchProject;
+                            });
+                            if (filtered.length === 0) return (
+                                <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)'}}>
+                                    <Icons.ListTodo size={40} style={{marginBottom:'12px',opacity:0.3}} />
+                                    <div style={{fontSize:'15px'}}>Nenhuma tarefa encontrada.</div>
+                                </div>
+                            );
+                            const pending = filtered.filter((tk: any) => !tk.isDone);
+                            const done = filtered.filter((tk: any) => tk.isDone);
+                            const priorityColors: Record<string,string> = {high:'var(--coral)',medium:'var(--amber)',low:'var(--green)'};
+                            const priorityLabels: Record<string,string> = {high:'Alta',medium:'Média',low:'Baixa'};
+                            const renderTask = (tk: any) => (
+                                <div key={tk.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',background:'var(--white)',border:'1.5px solid var(--cream-dark)',borderRadius:'12px',marginBottom:'8px',transition:'border-color 0.2s'}}>
+                                    <input type="checkbox" style={{accentColor:'var(--coral)',width:'16px',height:'16px',flexShrink:0,cursor:'pointer'}}
+                                        checked={bulkSelected.includes(tk.id)}
+                                        onChange={e => { e.stopPropagation(); setBulkSelected((prev: string[]) => prev.includes(tk.id) ? prev.filter((x: string) => x !== tk.id) : [...prev, tk.id]); }}
+                                    />
+                                    <div style={{width:'8px',height:'8px',borderRadius:'50%',background:priorityColors[tk.priority]||'var(--ink-faint)',flexShrink:0}} />
+                                    <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontSize:'14px',fontWeight:'500',color:'var(--ink)',textDecoration:tk.isDone?'line-through':'none',opacity:tk.isDone?0.5:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tk.title}</div>
+                                        <div style={{display:'flex',gap:'8px',marginTop:'4px',flexWrap:'wrap'}}>
+                                            {tk.date && <span style={{fontSize:'11px',color:'var(--ink-faint)'}}><Icons.Calendar size={10} style={{display:'inline',marginBottom:'-1px'}} /> {new Date(tk.date).toLocaleDateString('pt-BR')}</span>}
+                                            {tk.startTime && <span style={{fontSize:'11px',color:'var(--ink-faint)'}}><Icons.Clock size={10} style={{display:'inline',marginBottom:'-1px'}} /> {tk.startTime}{tk.endTime?` - ${tk.endTime}`:''}</span>}
+                                            {tk.project && <span style={{fontSize:'11px',background:'rgba(0,0,0,0.05)',borderRadius:'4px',padding:'1px 6px',color:'var(--ink-light)'}}>{tk.project.name}</span>}
+                                        </div>
+                                    </div>
+                                    <span style={{fontSize:'11px',fontWeight:'600',color:priorityColors[tk.priority]||'var(--ink-faint)',borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{priorityLabels[tk.priority]||''}</span>
+                                    <button onClick={async (e) => { e.stopPropagation(); await toggleTask(tk.id, !tk.isDone); const fresh = await getTasks(); setTasks(fresh); }} style={{background:'transparent',border:'none',cursor:'pointer',color:tk.isDone?'var(--green)':'var(--ink-faint)',padding:'4px',borderRadius:'6px',transition:'color 0.2s'}}>
+                                        <Icons.CheckCircle size={18} />
+                                    </button>
+                                </div>
+                            );
+                            return (
+                                <div>
+                                    {pending.length > 0 && (
+                                        <div style={{marginBottom:'24px'}}>
+                                            <div style={{fontSize:'12px',fontWeight:'700',color:'var(--ink-light)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'10px'}}>Pendentes ({pending.length})</div>
+                                            {pending.map(renderTask)}
+                                        </div>
+                                    )}
+                                    {done.length > 0 && (
+                                        <div>
+                                            <div style={{fontSize:'12px',fontWeight:'700',color:'var(--ink-light)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'10px'}}>Concluídas ({done.length})</div>
+                                            {done.map(renderTask)}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+
+                {/* ---- LISTA DE COMPRAS ---- */}
+                {activeTab === 'Lista de Compras' && (
+                    <div style={{maxWidth:'860px'}}>
+                        <div className="section-header">
+                            <h2>Lista de Compras</h2>
+                        </div>
+
+                        <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'24px',alignItems:'center'}}>
+                            <select
+                                style={{flex:'1 1 200px',padding:'10px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'14px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}}
+                                value={selectedListId || ""}
+                                onChange={e => setSelectedListId(e.target.value)}
+                            >
+                                {shoppingLists.length === 0 && <option value="">Nenhuma lista</option>}
+                                {shoppingLists.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                            <button
+                                style={{padding:'10px 18px',background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:'600',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}
+                                onClick={async () => {
+                                    const name = prompt('Nome da nova lista de compras:');
+                                    if (!name?.trim()) return;
+                                    const res = await createShoppingList({ name: name.trim() });
+                                    if ('id' in res) {
+                                        const fresh = await getShoppingLists();
+                                        setShoppingLists(fresh);
+                                        setSelectedListId((res as any).id);
+                                    }
+                                }}
+                            >
+                                <Icons.Plus size={14} style={{display:'inline',marginBottom:'-2px',marginRight:'5px'}} /> Nova lista
+                            </button>
+                            {selectedListId && (
+                                <button
+                                    style={{padding:'10px 14px',background:'rgba(232,80,58,0.08)',border:'1.5px solid rgba(232,80,58,0.2)',borderRadius:'10px',fontSize:'13px',fontWeight:'600',cursor:'pointer',color:'var(--coral)',flexShrink:0}}
+                                    onClick={async () => {
+                                        if (!confirm('Excluir lista e todos os itens?')) return;
+                                        await deleteShoppingList(selectedListId);
+                                        const fresh = await getShoppingLists();
+                                        setShoppingLists(fresh);
+                                        setSelectedListId((fresh as any[])[0]?.id ?? '');
+                                    }}
+                                >
+                                    <Icons.Trash2 size={14} style={{display:'inline',marginBottom:'-2px'}} />
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedListId ? (() => {
+                            const list = (shoppingLists as any[]).find((l: any) => l.id === selectedListId);
+                            if (!list) return null;
+                            const items: any[] = list.items ?? [];
+                            const pendingItems = items.filter((i: any) => !i.purchased);
+                            const purchasedItems = items.filter((i: any) => i.purchased);
+                            const total = items.reduce((acc: number, i: any) => acc + (i.purchased ? 0 : (i.estimatedPrice ?? 0) * (i.quantity ?? 1)), 0);
+                            const catIcons: Record<string,string> = {'Hortifruti':'🥦','Mercearia':'🛒','Limpeza':'🧹','Higiene':'Higiene','Bebidas':'🥤','Outros':'Outros'};
+                            const cats = ['Hortifruti','Mercearia','Limpeza','Higiene','Bebidas','Outros'];
+                            return (
+                                <div>
+                                    <div style={{background:'var(--white)',border:'1.5px solid var(--cream-dark)',borderRadius:'16px',padding:'20px',marginBottom:'24px'}}>
+                                        <div style={{fontSize:'13px',fontWeight:'700',color:'var(--ink)',marginBottom:'14px'}}>Adicionar item</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'2fr 80px 100px 160px auto',gap:'10px',alignItems:'end'}}>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Produto</div>
+                                                <input className="modal-input" style={{margin:0}} placeholder="Ex: Leite" value={newItemName} onChange={e => setNewItemName(e.target.value)} onKeyDown={e => { if(e.key==='Enter'){document.getElementById('addItemBtn')?.click();}}} />
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Qtd</div>
+                                                <input className="modal-input" style={{margin:0}} type="number" min="0.1" step="0.1" placeholder="1" value={newItemQuantity} onChange={e => setNewItemQuantity(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Unidade</div>
+                                                <select className="modal-select modal-input" style={{margin:0}} value={newItemUnit} onChange={e => setNewItemUnit(e.target.value)}>
+                                                    <option>un</option><option>kg</option><option>g</option><option>L</option><option>ml</option><option>cx</option><option>pct</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'11px',fontWeight:'600',color:'var(--ink-light)',marginBottom:'4px'}}>Categoria</div>
+                                                <select className="modal-select modal-input" style={{margin:0}} value={newItemCategory} onChange={e => setNewItemCategory(e.target.value)}>
+                                                    {cats.map(c => <option key={c}>{c}</option>)}
+                                                </select>
+                                            </div>
+                                            <button id="addItemBtn"
+                                                style={{padding:'10px 16px',background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:'700',cursor:'pointer',alignSelf:'end',whiteSpace:'nowrap'}}
+                                                onClick={async () => {
+                                                    if (!newItemName.trim() || !selectedListId) return;
+                                                    await createShoppingItem({
+                                                        listId: selectedListId,
+                                                        name: newItemName.trim(),
+                                                        quantity: parseFloat(newItemQuantity) || 1,
+                                                        unit: newItemUnit,
+                                                        category: newItemCategory,
+                                                        estimatedPrice: newItemPrice ? parseFloat(newItemPrice) : undefined,
+                                                    });
+                                                    const fresh = await getShoppingLists();
+                                                    setShoppingLists(fresh);
+                                                    setNewItemName(''); setNewItemQuantity('1'); setNewItemUnit('un'); setNewItemCategory('Hortifruti'); setNewItemPrice('');
+                                                }}
+                                            >
+                                                <Icons.Plus size={16} style={{display:'inline',marginBottom:'-2px'}} /> Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {total > 0 && (
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px',marginBottom:'16px',fontSize:'14px',color:'var(--ink-mid)'}}>
+                                            <Icons.DollarSign size={15} style={{color:'var(--green)'}} />
+                                            <span>Total estimado (pendentes): <strong style={{color:'var(--ink)'}}>R$ {total.toFixed(2).replace('.',',')}</strong></span>
+                                        </div>
+                                    )}
+
+                                    {pendingItems.length > 0 && (
+                                        <div style={{marginBottom:'24px'}}>
+                                            {cats.map(cat => {
+                                                const catItems = pendingItems.filter((i: any) => i.category === cat);
+                                                if (catItems.length === 0) return null;
+                                                return (
+                                                    <div key={cat} style={{marginBottom:'16px'}}>
+                                                        <div style={{fontSize:'12px',fontWeight:'700',color:'var(--ink-light)',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'8px'}}>{catIcons[cat]} {cat}</div>
+                                                        {catItems.map((item: any) => (
+                                                            <div key={item.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'12px 16px',background:'var(--white)',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',marginBottom:'6px'}}>
+                                                                <button
+                                                                    onClick={async () => { await toggleShoppingItem(item.id, true); const f = await getShoppingLists(); setShoppingLists(f); }}
+                                                                    style={{width:'22px',height:'22px',borderRadius:'50%',border:'2px solid var(--cream-dark)',background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 0.2s'}}
+                                                                    onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--green)';e.currentTarget.style.background='rgba(61,122,94,0.08)';}}
+                                                                    onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--cream-dark)';e.currentTarget.style.background='transparent';}}
+                                                                ></button>
+                                                                <div style={{flex:1}}>
+                                                                    <div style={{fontSize:'14px',fontWeight:'500',color:'var(--ink)'}}>{item.name}</div>
+                                                                    <div style={{fontSize:'12px',color:'var(--ink-faint)'}}>{item.quantity} {item.unit}{item.estimatedPrice ? ` · R$ ${(item.estimatedPrice * item.quantity).toFixed(2).replace('.',',')}` : ''}</div>
+                                                                </div>
+                                                                <button onClick={async () => { await deleteShoppingItem(item.id); const f = await getShoppingLists(); setShoppingLists(f); }} style={{background:'transparent',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'4px',borderRadius:'6px'}}>
+                                                                    <Icons.X size={14} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {pendingItems.length === 0 && purchasedItems.length === 0 && (
+                                        <div style={{textAlign:'center',padding:'48px 20px',color:'var(--ink-faint)'}}>
+                                            <Icons.ShoppingCart size={40} style={{marginBottom:'12px',opacity:0.25}} />
+                                            <div>Nenhum item ainda. Adicione acima!</div>
+                                        </div>
+                                    )}
+
+                                    {purchasedItems.length > 0 && (
+                                        <div style={{opacity:0.6}}>
+                                            <div style={{fontSize:'12px',fontWeight:'700',color:'var(--green)',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'10px'}}>Comprados ({purchasedItems.length})</div>
+                                            {purchasedItems.map((item: any) => (
+                                                <div key={item.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 16px',background:'var(--cream)',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',marginBottom:'6px'}}>
+                                                    <div style={{width:'22px',height:'22px',borderRadius:'50%',background:'var(--green)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                                        <Icons.Check size={12} color="white" strokeWidth={3} />
+                                                    </div>
+                                                    <div style={{flex:1,textDecoration:'line-through',fontSize:'14px',color:'var(--ink-light)'}}>{item.name} · {item.quantity} {item.unit}</div>
+                                                    <button onClick={async () => { await toggleShoppingItem(item.id, false); const f = await getShoppingLists(); setShoppingLists(f); }} style={{background:'transparent',border:'none',cursor:'pointer',color:'var(--ink-faint)',fontSize:'12px'}}>
+                                                        Desfazer
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })() : (
+                            <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)'}}>
+                                <Icons.ShoppingCart size={40} style={{marginBottom:'12px',opacity:0.3}} />
+                                <div style={{fontSize:'15px',marginBottom:'16px'}}>Nenhuma lista criada ainda.</div>
+                                <button onClick={async () => { const name = prompt('Nome da lista:'); if(!name?.trim()) return; const res = await createShoppingList({name:name.trim()}); if('id' in res){const fresh = await getShoppingLists(); setShoppingLists(fresh); setSelectedListId((res as any).id);} }} style={{padding:'12px 24px',background:'var(--coral)',color:'white',border:'none',borderRadius:'12px',fontSize:'14px',fontWeight:'600',cursor:'pointer'}}>
+                                    <Icons.Plus size={14} style={{display:'inline',marginBottom:'-2px',marginRight:'5px'}} /> Criar primeira lista
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     </div>
@@ -2036,7 +2733,19 @@ export default function Home() {
     
     <div className={`modal-overlay ${isModalOpen ? 'open' : ''}`} id="modal">
         <div className="modal">
-            <div className="modal-title">{presetImportant ? 'Nova Tarefa Importante' : 'Nova Tarefa'}</div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px'}}>
+                <div className="modal-title" style={{marginBottom:0}}>{presetImportant ? 'Nova Tarefa Importante' : 'Nova Tarefa'}</div>
+                <button onClick={() => {
+                    setNewTaskTitle("Revisar estratégia de Q" + Math.ceil((new Date().getMonth() + 1) / 3));
+                    setNewTaskDate(new Date().toISOString().split('T')[0]);
+                    setNewTaskStartTime("14:00");
+                    setNewTaskEndTime("15:30");
+                    setNewTaskPriority("high");
+                    setAuthError('');
+                }} style={{background:'linear-gradient(135deg, var(--coral), var(--purple))', color:'white', border:'none', padding:'6px 12px', borderRadius:'10px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px'}}>
+                    IA Sugerir
+                </button>
+            </div>
             <div className="modal-field">
                 <div className="modal-label">Título</div>
                 <input className="modal-input" type="text" placeholder="O que precisa ser feito?" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveTask()} autoFocus />
@@ -2047,15 +2756,12 @@ export default function Home() {
                     <input className="modal-input" type="date" value={newTaskDate} onChange={e => setNewTaskDate(e.target.value)} />
                 </div>
                 <div className="modal-field">
-                    <div className="modal-label">Tempo estimado</div>
-                    <select className="modal-select modal-input" value={newTaskTime} onChange={e => setNewTaskTime(e.target.value)}>
-                        <option value="">Sem estimativa</option>
-                        <option value="15min">15 min</option>
-                        <option value="30min">30 min</option>
-                        <option value="1h">1 hora</option>
-                        <option value="2h">2 horas</option>
-                        <option value="3h+">Mais de 3h</option>
-                    </select>
+                    <div className="modal-label">Horário (Das / Até)</div>
+                    <div style={{display:'flex', gap:'8px'}}>
+                        <input className="modal-input" type="time" value={newTaskStartTime} onChange={e => setNewTaskStartTime(e.target.value)} style={{padding:'10px 8px'}} title="Início" />
+                        <span style={{alignSelf:'center', color:'var(--ink-faint)', fontSize:'12px'}}>-</span>
+                        <input className="modal-input" type="time" value={newTaskEndTime} onChange={e => setNewTaskEndTime(e.target.value)} style={{padding:'10px 8px'}} title="Fim" />
+                    </div>
                 </div>
             </div>
             <div className="modal-row">
@@ -2137,6 +2843,57 @@ export default function Home() {
     )}
 
     {/* ======== NEW ROUTINE MODAL ======== */}
+    {/* ======== SHARE PROJECT MODAL ======== */}
+    {shareProjectId && (
+        <div className="modal-overlay open" onClick={() => setShareProjectId(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Compartilhar Projeto</div>
+                <div className="modal-field">
+                    <div className="modal-label">Convidar por E-mail</div>
+                    <div style={{display:'flex', gap:'8px'}}>
+                        <input className="modal-input" type="email" placeholder="Ex: colega@empresa.com" value={shareEmailInput} onChange={e => setShareEmailInput(e.target.value)} style={{flex:1}} />
+                        <button onClick={async () => {
+                            if (!shareEmailInput.trim()) return;
+                            if (currentUserData?.plan === 'FREE') {
+                                setSuccessToast('Acesso restrito. Compartilhamento avanado exige upgrade.');
+                                setTimeout(() => setSuccessToast(''), 4000);
+                                return;
+                            }
+                            try {
+                                const res = await inviteUserToProject(shareProjectId, shareEmailInput);
+                                if (res.success) {
+                                    setSuccessToast('Usurio adicionado com sucesso!');
+                                    setShareEmailInput('');
+                                    const p = await getProjects();
+                                    setProjects(p);
+                                }
+                            } catch (e: any) {
+                                setSuccessToast("Erro: ${e.message}");
+                                setTimeout(() => setSuccessToast(''), 4000);
+                            }
+                        }} style={{background:'var(--ink)', color:'white', border:'none', borderRadius:'8px', padding:'0 16px', fontWeight:'600', cursor:'pointer'}}>Enviar</button>
+                    </div>
+                </div>
+                <div className="modal-field" style={{marginTop:'24px'}}>
+                    <div className="modal-label">Membros Atuais</div>
+                    <div style={{display:'flex', flexDirection:'column', gap:'12px', marginTop:'12px'}}>
+                        {projects.find((p:any)=>p.id===shareProjectId)?.collaborators?.length > 0 ? projects.find((p:any)=>p.id===shareProjectId)?.collaborators?.map((c:any) => (
+                            <div key={c.id} style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                {c.image ? <img src={c.image} alt={c.name} style={{width:'32px', height:'32px', borderRadius:'16px', objectFit:'cover'}} /> : <div style={{width:'32px', height:'32px', borderRadius:'16px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:'700'}}>{c.name?.charAt(0)?.toUpperCase() || '?'}</div>}
+                                <div style={{display:'flex', flexDirection:'column'}}>
+                                    <span style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{c.name || 'Usurio'}</span>
+                                    <span style={{fontSize:'12px', color:'var(--ink-light)'}}>{c.email}</span>
+                                </div>
+                            </div>
+                        )) : <div style={{fontSize:'14px', color:'var(--ink-light)'}}>Apenas voc tem acesso a este projeto.</div>}
+                    </div>
+                </div>
+                <div className="modal-actions" style={{marginTop:'32px'}}>
+                    <button className="modal-cancel" onClick={() => { setShareProjectId(null); setShareEmailInput(''); }} style={{width:'100%'}}>Fechar</button>
+                </div>
+            </div>
+        </div>
+    )}
     {isRoutineModalOpen && (
         <div className="modal-overlay open" onClick={() => setIsRoutineModalOpen(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
@@ -2188,6 +2945,111 @@ export default function Home() {
                         }
                     }}>Criar rotina</button>
                 </div>
+            </div>
+        </div>
+    )}
+
+    {/* ======== AI ASSISTANT FAB & PANEL ======== */}
+    {['Meu Dia', 'Caixa de Entrada', 'Esta Semana', 'Lista de Compras', 'Rotinas'].includes(activeTab) && (
+        <button className="ai-fab" onClick={() => {
+            if (currentUserData?.plan !== 'PREMIUM') {
+                setSuccessToast('Acesso restrito. O Assistente IA é exclusivo do Plano Premium.');
+                setTimeout(() => setSuccessToast(''), 4000);
+                return;
+            }
+            setIsAiChatOpen(true);
+        }} title="Assistente IA">
+            <Icons.Sparkles size={24} />
+        </button>
+    )}
+
+    <div className={`ai-panel-overlay ${isAiChatOpen ? 'open' : ''}`} onClick={() => setIsAiChatOpen(false)}>
+        <div className="ai-panel" onClick={e => e.stopPropagation()}>
+            <div className="ai-header">
+                <div className="ai-title"><Icons.Sparkles size={20} color="var(--coral)" /> IA Assistente</div>
+                <button onClick={() => setIsAiChatOpen(false)} style={{background:'transparent', border:'none', color:'var(--ink-light)', cursor:'pointer', padding:'4px', borderRadius:'8px'}}><Icons.X size={20} /></button>
+            </div>
+            <div className="ai-chat-area">
+                {chatMessages.map((msg, i) => (
+                    <div key={i} className={`ai-bubble ${msg.role}`}>
+                        {msg.content}
+                    </div>
+                ))}
+                {isAiTyping && (
+                    <div className="ai-bubble ai">
+                        <div className="typing-indicator">
+                            <div className="typing-dot"></div><div className="typing-dot"></div><div className="typing-dot"></div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <form className="ai-input-area" onSubmit={handleSendAiMessage}>
+                <div className="ai-input-wrapper">
+                    <input type="text" className="ai-input" placeholder="Pergunte sobre suas tarefas..." value={chatInput} onChange={e => setChatInput(e.target.value)} />
+                    <button type="submit" className="ai-send-btn" disabled={!chatInput.trim() || isAiTyping}>
+                        <Icons.Send size={14} style={{marginLeft:'2px'}} />
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {/* ======== CREATE TEAM MODAL ======== */}
+    {isCreateTeamModalOpen && (
+        <div className="modal-overlay open" onClick={() => setIsCreateTeamModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Criar Nova Equipe</div>
+                <div className="modal-field"><div className="modal-label">Nome da Equipe</div><input className="modal-input" placeholder="Ex: Equipe de Vendas..." value={newTeamName} onChange={e => setNewTeamName(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Descricao</div><input className="modal-input" placeholder="Objetivo da equipe..." value={newTeamDescription} onChange={e => setNewTeamDescription(e.target.value)}/></div>
+                <div className="modal-actions">
+                    <button className="modal-cancel" onClick={() => setIsCreateTeamModalOpen(false)}>Cancelar</button>
+                    <button className="modal-save" onClick={async () => { if (!newTeamName.trim()) return; try { await createTeam(newTeamName.trim(), newTeamDescription.trim()); setNewTeamName(''); setNewTeamDescription(''); setIsCreateTeamModalOpen(false); const tms = await getTeams(); setTeams(tms); setSuccessToast('Equipe criada!'); setTimeout(()=>setSuccessToast(''),3000); } catch(e:any) { setSuccessToast(e.message); setTimeout(()=>setSuccessToast(''),4000); } }}>Criar Equipe</button>
+                </div>
+            </div>
+        </div>
+    )}
+    {isInviteModalOpen && selectedTeamId && (
+        <div className="modal-overlay open" onClick={() => setIsInviteModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Convidar Membro</div>
+                <div className="modal-field"><div className="modal-label">E-mail</div><input className="modal-input" type="email" placeholder="email@exemplo.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Cargo</div><select className="modal-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>{teamDetails?.members?.find((m:any)=>m.userId===currentUserData?.id)?.role==='OWNER'&&<option value="VICE_OWNER">Vice-Anfitriao</option>}<option value="SUPERVISOR">Supervisor</option><option value="WORKER">Trabalhador</option></select></div>
+                <div className="modal-actions">
+                    <button className="modal-cancel" onClick={() => setIsInviteModalOpen(false)}>Cancelar</button>
+                    <button className="modal-save" onClick={async () => { if(!inviteEmail.trim()) return; try { const res = await inviteToTeam(selectedTeamId, inviteEmail.trim(), inviteRole); if((res as any)?.error){setSuccessToast((res as any).error);}else{setSuccessToast('Convite enviado!');} setInviteEmail(''); setIsInviteModalOpen(false); setTimeout(()=>setSuccessToast(''),3000); const det = await getTeamDetails(selectedTeamId); setTeamDetails(det); } catch(e:any){setSuccessToast(e.message);setTimeout(()=>setSuccessToast(''),4000);} }}>Enviar</button>
+                </div>
+            </div>
+        </div>
+    )}
+    {isAssignTaskModalOpen && selectedTeamId && teamDetails && (
+        <div className="modal-overlay open" onClick={() => setIsAssignTaskModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Atribuir Tarefa</div>
+                <div className="modal-field"><div className="modal-label">Titulo</div><input className="modal-input" placeholder="Descricao..." value={assignTaskTitle} onChange={e => setAssignTaskTitle(e.target.value)}/></div>
+                <div className="modal-field"><div className="modal-label">Para</div><select className="modal-input" value={assignToMemberId} onChange={e => setAssignToMemberId(e.target.value)}><option value="">Selecione...</option>{(teamDetails.members||[]).filter((m:any)=>m.userId!==currentUserData?.id).map((m:any)=><option key={m.id} value={m.userId}>{m.user.name}</option>)}</select></div>
+                <div className="modal-field"><div className="modal-label">Prioridade</div><select className="modal-input" value={assignTaskPriority} onChange={e => setAssignTaskPriority(e.target.value)}><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baixa</option></select></div>
+                <div className="modal-field"><div className="modal-label">Data (opcional)</div><input className="modal-input" type="date" value={assignTaskDate} onChange={e => setAssignTaskDate(e.target.value)}/></div>
+                <div className="modal-actions">
+                    <button className="modal-cancel" onClick={() => setIsAssignTaskModalOpen(false)}>Cancelar</button>
+                    <button className="modal-save" onClick={async () => { if(!assignTaskTitle.trim()||!assignToMemberId) return; try { await assignTaskToMember(selectedTeamId, assignToMemberId, assignTaskTitle.trim(), assignTaskPriority, assignTaskDate||undefined); setAssignTaskTitle(''); setAssignToMemberId(''); setAssignTaskDate(''); setIsAssignTaskModalOpen(false); setSuccessToast('Tarefa atribuida!'); setTimeout(()=>setSuccessToast(''),3000); const [det,st]=await Promise.all([getTeamDetails(selectedTeamId),getTeamStats(selectedTeamId)]); setTeamDetails(det); setTeamStats(st); } catch(e:any){setSuccessToast(e.message);setTimeout(()=>setSuccessToast(''),4000);} }}>Atribuir</button>
+                </div>
+            </div>
+        </div>
+    )}
+    {isInvitationsModalOpen && (
+        <div className="modal-overlay open" onClick={() => setIsInvitationsModalOpen(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">Convites Pendentes</div>
+                {myInvitations.length === 0 ? <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:'14px'}}>Nenhum convite pendente.</div> : myInvitations.map((inv:any) => (
+                    <div key={inv.id} style={{padding:'16px',borderRadius:'14px',border:'1.5px solid var(--cream-dark)',marginBottom:'12px'}}>
+                        <div style={{fontWeight:'700',fontSize:'15px',color:'var(--ink)',marginBottom:'4px'}}>{inv.team?.name}</div>
+                        <div style={{fontSize:'13px',color:'var(--ink-light)',marginBottom:'12px'}}>Convidado como <b>{inv.role==='WORKER'?'Trabalhador':inv.role==='SUPERVISOR'?'Supervisor':inv.role==='VICE_OWNER'?'Vice-Anfitriao':inv.role}</b></div>
+                        <div style={{display:'flex',gap:'8px'}}>
+                            <button onClick={async()=>{await respondToInvitation(inv.id,true);const i2=await getMyInvitations();setMyInvitations(i2);const tms=await getTeams();setTeams(tms);setSuccessToast('Convite aceito!');setTimeout(()=>setSuccessToast(''),3000);}} style={{flex:1,background:'var(--coral)',color:'white',border:'none',borderRadius:'10px',padding:'10px',fontWeight:'600',cursor:'pointer',fontSize:'13px'}}>Aceitar</button>
+                            <button onClick={async()=>{await respondToInvitation(inv.id,false);const i2=await getMyInvitations();setMyInvitations(i2);setSuccessToast('Recusado.');setTimeout(()=>setSuccessToast(''),3000);}} style={{flex:1,background:'var(--cream)',color:'var(--ink)',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',padding:'10px',fontWeight:'600',cursor:'pointer',fontSize:'13px'}}>Recusar</button>
+                        </div>
+                    </div>
+                ))}
+                <button className="modal-cancel" onClick={() => setIsInvitationsModalOpen(false)} style={{width:'100%',marginTop:'8px'}}>Fechar</button>
             </div>
         </div>
     )}

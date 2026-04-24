@@ -13,13 +13,11 @@ export async function POST(req: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { plan } = await req.json(); // "PRO" or "PREMIUM"
+    const { plan, billingAnnual } = await req.json(); // "PRO" or "PREMIUM"
     
     // In a real app, these should be from your Stripe Dashboard Products
     // Below are mockup price amounts assuming BRL currency
-    const priceId = plan === 'PREMIUM' 
-      ? process.env.STRIPE_PRICE_PREMIUM || 'price_premium_mock'
-      : process.env.STRIPE_PRICE_PRO || 'price_pro_mock';
+    const isAnnual = !!billingAnnual;
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email }
@@ -41,12 +39,12 @@ export async function POST(req: Request) {
           price_data: {
             currency: 'BRL',
             product_data: {
-              name: plan === 'PREMIUM' ? 'EasyList Premium — Equipe & IA' : 'EasyList Pro — Produtividade Avançada',
+              name: plan === 'PREMIUM' ? `EasyList Premium - Equipe & IA (${isAnnual ? 'Anual' : 'Mensal'})` : `EasyList Pro - Produtividade Avançada (${isAnnual ? 'Anual' : 'Mensal'})`,
               description: plan === 'PREMIUM' ? 'Produtividade em equipe e IA. Até 5 usuários.' : 'Tarefas, projetos e rotinas ilimitados.'
             },
-            unit_amount: plan === 'PREMIUM' ? 5990 : 2990, // in cents (R$ 59.90 or R$ 29.90)
+            unit_amount: plan === 'PREMIUM' ? (isAnnual ? 57480 : 5990) : (isAnnual ? 28680 : 2990), // in cents
             recurring: {
-                interval: 'month'
+                interval: isAnnual ? 'year' : 'month'
             }
           },
           quantity: 1,
@@ -55,6 +53,7 @@ export async function POST(req: Request) {
       metadata: {
         userId: user.id,
         plan: plan,
+        billingCycle: isAnnual ? 'yearly' : 'monthly'
       },
     });
 
