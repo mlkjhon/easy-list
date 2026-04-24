@@ -9,6 +9,9 @@ const fraunces = Fraunces({ subsets: ["latin"], weight: ["300", "500", "700"], s
 export const metadata: Metadata = {
   title: "easy list — sua agenda inteligente",
   description: "A agenda inteligente para freelancers, estudantes e empreendedores.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
