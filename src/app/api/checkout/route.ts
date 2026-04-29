@@ -40,7 +40,7 @@ export async function POST(req: Request) {
             currency: 'BRL',
             product_data: {
               name: plan === 'PREMIUM' ? `EasyList Premium - Equipe & IA (${isAnnual ? 'Anual' : 'Mensal'})` : `EasyList Pro - Produtividade Avançada (${isAnnual ? 'Anual' : 'Mensal'})`,
-              description: plan === 'PREMIUM' ? 'Produtividade em equipe e IA. Até 5 usuários.' : 'Tarefas, projetos e rotinas ilimitados.'
+              description: plan === 'PREMIUM' ? 'Produtividade em equipe e IA. Até 5 usuários.' : 'Tarefas e rotinas ilimitadas.'
             },
             unit_amount: plan === 'PREMIUM' ? (isAnnual ? 57480 : 5990) : (isAnnual ? 28680 : 2990), // in cents
             recurring: {

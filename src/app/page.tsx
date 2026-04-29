@@ -1333,7 +1333,7 @@ export default function Home() {
                                 ? <span style={{fontWeight:700,color:'var(--ink)'}}>Meu Perfil</span>
                                 : activeTab === 'Configurações'
                                 ? <span style={{fontWeight:700,color:'var(--ink)'}}>Configurações</span>
-                                : <span style={{fontWeight:700,color:'var(--ink)'}}>{activeTab.startsWith('proj-') ? projects.find((p:any)=>p.id===activeTab.replace('proj-',''))?.name || 'Projeto' : activeTab}</span>}
+                                : <span style={{fontWeight:700,color:'var(--ink)'}}>{activeTab}</span>}
                             </div>
                             <div className="app-date">{mounted ? new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}</div>
                         </div>
@@ -2396,11 +2396,7 @@ export default function Home() {
                                 <option value="medium">Média</option>
                                 <option value="low">Baixa</option>
                             </select>
-                            <select style={{padding:'9px 14px',border:'1.5px solid var(--cream-dark)',borderRadius:'10px',fontSize:'13px',background:'var(--white)',color:'var(--ink)',cursor:'pointer'}} value={taskFilterProject} onChange={e => setTaskFilterProject(e.target.value)}>
-                                <option value="all">Todos projetos</option>
-                                <option value="none">Sem projeto</option>
-                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
+
                             {bulkSelected.length > 0 && (
                                 <button
                                     onClick={async () => {
