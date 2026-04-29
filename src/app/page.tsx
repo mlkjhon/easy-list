@@ -1866,6 +1866,7 @@ export default function Home() {
                                                                 <div style={{fontSize:'12px', color:'var(--ink-light)'}}>{ROLE_LABELS[s.role]||s.role}</div>
                                                             </div>
                                                             <div style={{marginLeft:'auto', fontSize:'28px', fontWeight:'800', color: s.rate===100?'var(--green)':s.rate>=50?'var(--amber)':'var(--coral)', fontFamily:"'Fraunces',serif"}}>{s.rate}%</div>
+                                                        </div>
                                                         <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(80px, 1fr))', gap:'10px', marginBottom:'16px'}}>
                                                             {[{label:'Total', val:s.total, color:'var(--ink)'},{label:'Concluídas', val:s.done, color:'var(--green)'},{label:'Pendentes', val:s.pending, color:'var(--coral)'}].map(({label,val,color}) => (
                                                                 <div key={label} style={{textAlign:'center', padding:'10px', borderRadius:'12px', background:'var(--white)'}}>
