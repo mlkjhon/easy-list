@@ -34,73 +34,56 @@ export async function getCurrentUserData() {
 // TASKS
 // ========================
 export async function getTasks() {
-  try {
-    const user = await getUser();
-    if (!user) return [];
+  const user = await getUser();
+  if (!user) return [];
 
-    // Reset routine tasks that were completed before today started
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    
-    await prisma.task.updateMany({
-      where: {
-        userId: user.id,
-        isDone: true,
-        routineName: { not: null },
-        updatedAt: { lt: startOfToday }
-      },
-      data: { isDone: false },
-    });
+  // Reset routine tasks that were completed before today started
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  
+  await prisma.task.updateMany({
+    where: {
+      userId: user.id,
+      isDone: true,
+      routineName: { not: null },
+      updatedAt: { lt: startOfToday }
+    },
+    data: { isDone: false },
+  });
 
-    return prisma.task.findMany({
-      where: {
-        OR: [
-          { userId: user.id },
-          { project: { collaborators: { some: { id: user.id } } } }
-        ]
-      },
-      include: { project: true },
-      orderBy: { createdAt: "desc" },
-    });
-  } catch (error) {
-    console.error("Erro ao buscar tarefas (possível migração pendente):", error);
-    const user = await getUser();
-    if (!user) return [];
-    return prisma.task.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
-  }
+  return prisma.task.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 export async function createTask(data: {
   title: string;
   priority: string;
+  description?: string;
+  topics?: string[];
   time?: string;
   startTime?: string;
   endTime?: string;
-  projectId?: string;
   date?: string;
   routineName?: string;
-  isImportant?: boolean;
 }) {
   const user = await getUser();
   if (!user) throw new Error("Unauthorized");
-
-  // FREE plan: unlimited tasks (no limit enforced)
 
   const task = await prisma.task.create({
     data: {
       title: data.title,
       priority: data.priority,
+      description: data.description || null,
+      topics: data.topics || [],
       time: data.time || null,
       startTime: data.startTime || null,
       endTime: data.endTime || null,
       userId: user.id,
-      projectId: data.projectId || null,
       date: data.date ? new Date(data.date) : null,
       routineName: data.routineName || null,
-    },
+    } as any,
   });
 
   revalidatePath("/");
@@ -110,10 +93,11 @@ export async function createTask(data: {
 export async function updateTask(id: string, data: {
   title?: string;
   priority?: string;
+  description?: string;
+  topics?: string[];
   time?: string;
   startTime?: string;
   endTime?: string;
-  projectId?: string;
   date?: string;
   routineName?: string;
 }) {
@@ -123,10 +107,11 @@ export async function updateTask(id: string, data: {
   const updateData: any = {};
   if (data.title !== undefined) updateData.title = data.title;
   if (data.priority !== undefined) updateData.priority = data.priority;
+  if (data.description !== undefined) updateData.description = data.description || null;
+  if (data.topics !== undefined) updateData.topics = data.topics;
   if (data.time !== undefined) updateData.time = data.time || null;
   if (data.startTime !== undefined) updateData.startTime = data.startTime || null;
   if (data.endTime !== undefined) updateData.endTime = data.endTime || null;
-  if (data.projectId !== undefined) updateData.projectId = data.projectId || null;
   if (data.date !== undefined) updateData.date = data.date ? new Date(data.date) : null;
   if (data.routineName !== undefined) updateData.routineName = data.routineName || null;
 
@@ -173,91 +158,7 @@ export async function deleteTask(id: string) {
   revalidatePath("/");
 }
 
-// ========================
-// PROJECTS
-// ========================
-export async function getProjects() {
-  try {
-    const user = await getUser();
-    if (!user) return [];
-    return prisma.project.findMany({
-      where: {
-        OR: [
-          { userId: user.id },
-          { collaborators: { some: { id: user.id } } }
-        ]
-      },
-      include: { _count: { select: { tasks: true } }, collaborators: { select: { id: true, name: true, image: true, email: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-  } catch (error) {
-    console.error("Erro ao buscar projetos (possível migração pendente):", error);
-    const user = await getUser();
-    if (!user) return [];
-    return prisma.project.findMany({
-      where: { userId: user.id },
-      include: { _count: { select: { tasks: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-  }
-}
-
-export async function createProject(data: { name: string; color: string }) {
-  const user = await getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  // FREE plan: unlimited projects (no limit enforced)
-
-  const project = await prisma.project.create({
-    data: { name: data.name, color: data.color, userId: user.id },
-    include: { _count: { select: { tasks: true } } },
-  });
-
-  revalidatePath("/");
-  return project;
-}
-
-export async function deleteProject(id: string) {
-  const user = await getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  await prisma.project.delete({ where: { id, userId: user.id } });
-  revalidatePath("/");
-}
-
-export async function inviteUserToProject(projectId: string, email: string) {
-  const user = await getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, userId: user.id },
-    include: { collaborators: true }
-  });
-  if (!project) throw new Error("Projeto não encontrado ou você não é o dono.");
-
-  // Only PRO and PREMIUM can share projects
-  if ((user as any).plan === 'FREE') {
-    throw new Error("Compartilhamento de projetos está disponível nos planos Pro e Premium. Faça upgrade!");
-  }
-
-  const limit = (user as any).plan === 'PREMIUM' ? 5 : 3;
-  if (project.collaborators.length >= limit) {
-    throw new Error(`Seu plano permite até ${limit} colaboradores por projeto.`);
-  }
-
-  const targetUser = await prisma.user.findUnique({ where: { email } });
-  if (!targetUser) throw new Error("Usuário não cadastrado na plataforma.");
-  if (targetUser.id === user.id) throw new Error("Você não pode convidar a si mesmo.");
-  if (project.collaborators.find((c: any) => c.id === targetUser.id)) throw new Error("Usuário já está colaborando no projeto.");
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { collaborators: { connect: { id: targetUser.id } } }
-  });
-
-  revalidatePath("/");
-  return { success: true };
-}
+// (Project module removed)
 
 // ========================
 // ROUTINES

@@ -5,11 +5,11 @@ import * as Icons from "lucide-react";
 import { type Lang, getLangFromBrowser, t } from '@/lib/translations';
 import {
   getTasks, createTask, updateTask, toggleTask, rescheduleTask, deleteTask, registerUser,
-  getProjects, createProject, deleteProject, getTeams, createTeam, deleteTeam, getTeamDetails, sendTeamMessage,
+  getTeams, createTeam, deleteTeam, getTeamDetails, sendTeamMessage,
   inviteToTeam, respondToInvitation, updateMemberRole, removeMember, assignTaskToMember, getTeamStats, cancelInvitation, getMyInvitations,
   getRoutines, createRoutine, deleteRoutine,
   getStats, updateUserProfile, updateProfileImage, updateUserPassword, deleteAccount, resetRoutineTasks,
-  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser, inviteUserToProject,
+  getCurrentUserData, adminGetAllUsers, adminUpdateUserStatus, adminUpdateUserPlan, adminDeleteUser,
   getShoppingLists, createShoppingList, deleteShoppingList, renameShoppingList,
   createShoppingItem, updateShoppingItem, toggleShoppingItem, deleteShoppingItem,
   clearPurchasedItems, duplicateShoppingList
@@ -40,7 +40,9 @@ export default function Home() {
   const [newTaskStartTime, setNewTaskStartTime] = useState("");
   const [newTaskEndTime, setNewTaskEndTime] = useState("");
   const [newTaskRoutine, setNewTaskRoutine] = useState("");
-  const [presetProjectId, setPresetProjectId] = useState<string|null>(null);
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskTopics, setNewTaskTopics] = useState<string[]>([]);
+  const [newTopicInput, setNewTopicInput] = useState("");
   const [presetImportant, setPresetImportant] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string|null>(null);
   
@@ -48,19 +50,15 @@ export default function Home() {
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', content:string}[]>([
-    { role: 'ai', content: 'Olá! Sou seu Assistente Easy List. O que você gostaria de analisar hoje?' }
+    { role: 'ai', content: 'Olá! Sou seu assistente de produtividade. Estou aqui para te ajudar a organizar suas tarefas e manter o foco no que realmente importa. Como posso te ajudar hoje?' }
   ]);
   const [isAiTyping, setIsAiTyping] = useState(false);
 
   // UI Globals
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Projects
-  const [projects, setProjects] = useState<any[]>([]);
+  // Teams
   const [teams, setTeams] = useState<any[]>([]);
-  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectColor, setNewProjectColor] = useState("#E8503A");
 
   // Routines
   const [routines, setRoutines] = useState<any[]>([]);
@@ -134,10 +132,7 @@ export default function Home() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [newItemQuantity, setNewItemQuantity] = useState("1");
-  const [shareProjectId, setShareProjectId] = useState<string|null>(null);
-  const [shareEmailInput, setShareEmailInput] = useState('');
 
-  // Teams
   const [selectedTeamId, setSelectedTeamId] = useState<string|null>(null);
   const [teamDetails, setTeamDetails] = useState<any>(null);
   const [teamStats, setTeamStats] = useState<any>(null);
@@ -174,18 +169,19 @@ export default function Home() {
         }
         setCurrentUserData(data);
 
-        const [t, p, r, sl, tms, invs] = await Promise.all([getTasks(), getProjects(), getRoutines(), getShoppingLists(), getTeams(), getMyInvitations()]);
-        setTeams(tms);
-        setMyInvitations(invs || []);
-        setTasks(t);
-        setProjects(p);
-        setRoutines(r);
-        setShoppingLists(sl);
-        if (sl.length > 0) setSelectedListId(sl[0].id);
+        const [tasksData, routinesData, shoppingData, teamsData, invsData] = await Promise.all([
+          getTasks(), getRoutines(), getShoppingLists(), getTeams(), getMyInvitations()
+        ]);
+        setTeams(teamsData);
+        setMyInvitations(invsData || []);
+        setTasks(tasksData);
+        setRoutines(routinesData);
+        setShoppingLists(shoppingData);
+        if (shoppingData.length > 0) setSelectedListId(shoppingData[0].id);
 
         getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
         
-        if (t.length === 0 && p.length === 0 && r.length === 0 && !localStorage.getItem('ob_' + data?.email)) {
+        if (tasksData.length === 0 && routinesData.length === 0 && !localStorage.getItem('ob_' + data?.email)) {
             setActiveScreen("onboarding");
             setObStep(3);
         } else {
@@ -206,7 +202,7 @@ export default function Home() {
           }
         }
       });
-    } else if (status === "unauthenticated" && activeScreen === "app") {
+    } else if (status === "unauthenticated") {
       setActiveScreen("landing");
     }
   }, [status]);
@@ -294,7 +290,7 @@ export default function Home() {
     if (session?.user?.name) setEditName(session.user.name);
   }, [session]);
 
-  const openTaskModal = (opts?: { priority?: string; date?: string; projectId?: string; important?: boolean; taskToEdit?: any }) => {
+  const openTaskModal = (opts?: { priority?: string; date?: string; important?: boolean; taskToEdit?: any }) => {
     if (opts?.taskToEdit) {
       setEditTaskId(opts.taskToEdit.id);
       setNewTaskTitle(opts.taskToEdit.title);
@@ -303,7 +299,8 @@ export default function Home() {
       setNewTaskStartTime(opts.taskToEdit.startTime || "");
       setNewTaskEndTime(opts.taskToEdit.endTime || "");
       setNewTaskRoutine(opts.taskToEdit.routineName || "");
-      setPresetProjectId(opts.taskToEdit.projectId || null);
+      setNewTaskDescription(opts.taskToEdit.description || "");
+      setNewTaskTopics(opts.taskToEdit.topics || []);
       setPresetImportant(opts.taskToEdit.priority === 'high');
       setIsModalOpen(true);
       return;
@@ -315,7 +312,9 @@ export default function Home() {
     setNewTaskStartTime("");
     setNewTaskEndTime("");
     setNewTaskRoutine("");
-    setPresetProjectId(opts?.projectId || null);
+    setNewTaskDescription("");
+    setNewTaskTopics([]);
+    setNewTopicInput("");
     setPresetImportant(opts?.important || false);
     setIsModalOpen(true);
   };
@@ -332,16 +331,23 @@ export default function Home() {
     setChatInput("");
     setIsAiTyping(true);
 
-    // Mock AI Reply
     setTimeout(() => {
       setIsAiTyping(false);
-      let aiResponse = `Este é um protótipo visual! Em breve me conectarei à API do Gemini para respostas reais. Pude ver que você tem ${tasks.length} tarefas pendentes. Posso te ajudar a organizá-las?`;
+      const pendingTasks = tasks.filter(t => !t.isDone);
+      const highPriority = pendingTasks.filter(t => t.priority === 'high');
+      let aiResponse = `Você tem ${pendingTasks.length} tarefa${pendingTasks.length !== 1 ? 's' : ''} pendente${pendingTasks.length !== 1 ? 's' : ''}${highPriority.length > 0 ? `, sendo ${highPriority.length} de alta prioridade` : ''}. Que tal começarmos pelo que é mais urgente?`;
       if (userMsg.toLowerCase().includes("hoje")) {
         const todayTasks = tasks.filter(t => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0]);
-        aiResponse = `Você tem ${todayTasks.length} tarefas pendentes para hoje. Que tal focarmos nas de prioridade Alta primeiro?`;
+        aiResponse = todayTasks.length > 0
+          ? `Para hoje, você tem ${todayTasks.length} tarefa${todayTasks.length > 1 ? 's' : ''} programada${todayTasks.length > 1 ? 's' : ''}. Minha sugestão é começar pelas de alta prioridade e ir avançando. Você consegue!`
+          : `Parece que sua agenda de hoje está livre de tarefas com data definida. É uma ótima oportunidade para avançar nas pendentes sem prazo.`;
+      } else if (userMsg.toLowerCase().includes("prioridade") || userMsg.toLowerCase().includes("importante")) {
+        aiResponse = highPriority.length > 0
+          ? `Você tem ${highPriority.length} tarefa${highPriority.length > 1 ? 's' : ''} de alta prioridade: ${highPriority.slice(0, 3).map(t => `"${t.title}"`).join(', ')}${highPriority.length > 3 ? ` e mais ${highPriority.length - 3}` : ''}. Essas merecem atenção imediata.`
+          : `Ótima notícia! Você não tem nenhuma tarefa de alta prioridade pendente. Continue assim!`;
       }
       setChatMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
-    }, 1500);
+    }, 1200);
   };
 
   const handleSaveTask = async () => {
@@ -367,14 +373,15 @@ export default function Home() {
       }
     }
     
-    const taskData = {
+    const taskData: any = {
       title: newTaskTitle,
       priority: presetImportant ? 'high' : newTaskPriority,
       startTime: newTaskStartTime || undefined,
       endTime: newTaskEndTime || undefined,
       date: newTaskDate || undefined,
       routineName: newTaskRoutine || undefined,
-      projectId: presetProjectId || undefined,
+      description: newTaskDescription || undefined,
+      topics: newTaskTopics.length > 0 ? newTaskTopics : undefined,
     };
 
     try {
@@ -387,7 +394,7 @@ export default function Home() {
       }
       
       setIsModalOpen(false);
-      setNewTaskTitle("");
+      setNewTaskTitle(""); setNewTaskDescription(""); setNewTaskTopics([]); setNewTopicInput("");
       setEditTaskId(null);
       refreshStats();
     } catch (err: any) {
@@ -475,16 +482,16 @@ export default function Home() {
     );
   };
 
-  if (status === "loading" && activeScreen === "app") {
+  if (status === "loading" || (status === "authenticated" && activeScreen !== "app" && activeScreen !== "onboarding" && activeScreen !== "landing")) {
     return (
       <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--cream)', color:'var(--ink)'}}>
         <style>{`
           @keyframes spin { 100% { transform: rotate(360deg); } }
-          .animate-spin { animation: spin 1s linear infinite; }
+          .animate-spin { animation: spin 0.8s linear infinite; }
         `}</style>
-        <Icons.Loader2 size={40} className="animate-spin" style={{marginBottom:'16px', color:'var(--coral)'}} />
-        <h2 style={{fontSize:'18px', fontWeight:'600'}}>Acessando sua conta...</h2>
-        <p style={{fontSize:'13px', color:'var(--ink-light)', marginTop:'8px'}}>Aguarde um momento</p>
+        <div style={{fontFamily:"'Fraunces', serif", fontSize:'28px', fontWeight:700, color:'var(--coral)', marginBottom:'20px', letterSpacing:'-0.5px'}}>Easy<span style={{color:'var(--ink)', fontWeight:300}}>List</span></div>
+        <Icons.Loader2 size={36} className="animate-spin" style={{marginBottom:'16px', color:'var(--coral)'}} />
+        <p style={{fontSize:'13px', color:'var(--ink-light)', marginTop:'4px'}}>Carregando sua conta...</p>
       </div>
     );
   }
@@ -1250,17 +1257,7 @@ export default function Home() {
                     )}
                 </div>
 
-                <div className="sidebar-section" style={{"marginTop":"20px"}}>
-                    <div className="sidebar-section-title">{t('projects', lang)}</div>
-                    {projects.map((p: any) => (
-                        <div key={p.id} className={`sidebar-project ${activeTab === `proj-${p.id}` ? 'active' : ''}`} onClick={() => setActiveTab(`proj-${p.id}`)}>
-                            <div className="sidebar-project-dot" style={{background: p.color}}></div>
-                            {p.name}
-                            <span style={{marginLeft:'auto',fontSize:'11px',color:'var(--ink-faint)'}}>{p._count?.tasks ?? 0}</span>
-                        </div>
-                    ))}
-                    <div style={{padding:'8px 12px',fontSize:'13px',color:'var(--coral)',cursor:'pointer'}} onClick={() => setIsNewProjectOpen(true)}>{t('newProject', lang)}</div>
-                </div>
+
 
                 {/* BOTTOM PROFILE - clickable */}
                 <div style={{"padding":"16px 24px","marginTop":"auto","position":"relative"}}>
@@ -1710,9 +1707,9 @@ export default function Home() {
                     const isOwner = myMembership?.role === 'OWNER';
                     const ROLE_LABELS: any = { OWNER: 'Anfitrião', VICE_OWNER: 'Vice-Anfitrião', SUPERVISOR: 'Supervisor', WORKER: 'Trabalhador' };
                     return (
-                    <div style={{display:'flex', gap:'20px', height:'calc(100vh - 120px)'}}>
+                    <div style={{display:'flex', gap:'20px', height:'calc(100vh - 120px)', flexWrap:'wrap', minHeight:'400px'}}>
                         {/* LEFT: Team list */}
-                        <div style={{width:'280px', background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden'}}>
+                        <div style={{width:'260px', minWidth:'200px', flexShrink:0, background:'var(--white)', borderRadius:'20px', border:'1px solid var(--cream-dark)', display:'flex', flexDirection:'column', overflow:'hidden'}}>
                             <div style={{padding:'16px 20px', borderBottom:'1px solid var(--cream-dark)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                 <span style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)'}}>Minhas Equipes</span>
                                 <button onClick={() => setIsCreateTeamModalOpen(true)} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'7px 12px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px'}}><Icons.Plus size={14}/>Criar</button>
@@ -1869,8 +1866,7 @@ export default function Home() {
                                                                 <div style={{fontSize:'12px', color:'var(--ink-light)'}}>{ROLE_LABELS[s.role]||s.role}</div>
                                                             </div>
                                                             <div style={{marginLeft:'auto', fontSize:'28px', fontWeight:'800', color: s.rate===100?'var(--green)':s.rate>=50?'var(--amber)':'var(--coral)', fontFamily:"'Fraunces',serif"}}>{s.rate}%</div>
-                                                        </div>
-                                                        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px', marginBottom:'16px'}}>
+                                                        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(80px, 1fr))', gap:'10px', marginBottom:'16px'}}>
                                                             {[{label:'Total', val:s.total, color:'var(--ink)'},{label:'Concluídas', val:s.done, color:'var(--green)'},{label:'Pendentes', val:s.pending, color:'var(--coral)'}].map(({label,val,color}) => (
                                                                 <div key={label} style={{textAlign:'center', padding:'10px', borderRadius:'12px', background:'var(--white)'}}>
                                                                     <div style={{fontSize:'22px', fontWeight:'800', color, fontFamily:"'Fraunces',serif"}}>{val}</div>
@@ -2025,35 +2021,6 @@ export default function Home() {
                                 })()}
                             </div>
                         </div>
-
-                        {currentUserData?.plan === 'PREMIUM' && projects.some(p => p.collaborators?.length > 0) && (
-                            <div style={{marginTop:'32px'}}>
-                                <div className="section-header"><h2>Equipes Ativas em Projetos</h2></div>
-                                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'16px', marginBottom:'32px'}}>
-                                    {projects.filter(p => p.collaborators?.length > 0).map(p => (
-                                        <div key={p.id} style={{background:'var(--cream)', borderRadius:'16px', padding:'20px', border:'1.5px solid var(--cream-dark)'}}>
-                                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px'}}>
-                                                <div style={{fontWeight:'700', color:p.color}}>{p.name}</div>
-                                                <div style={{fontSize:'11px', background:'white', padding:'4px 8px', borderRadius:'10px', color:'var(--ink-mid)', border:'1px solid var(--cream-dark)'}}>{p.collaborators.length + 1} membros</div>
-                                            </div>
-                                            <div style={{display:'flex', gap:'6px', marginBottom:'16px'}}>
-                                                <div title="Dono" style={{width:'28px', height:'28px', borderRadius:'14px', background:'var(--white)', border:'1.5px solid var(--coral)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'700'}}>D</div>
-                                                {p.collaborators.map((c: any) => (
-                                                    <div key={c.id} title={c.name} style={{width:'28px', height:'28px', borderRadius:'14px', background:'white', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'700'}}>{c.name?.charAt(0).toUpperCase()}</div>
-                                                ))}
-                                            </div>
-                                            <div style={{fontSize:'12px', color:'var(--ink-mid)', display:'flex', justifyContent:'space-between'}}>
-                                                <span>Progresso do Time:</span>
-                                                <span style={{fontWeight:'600'}}>{tasks.filter(t => t.projectId === p.id && t.isDone).length} / {tasks.filter(t => t.projectId === p.id).length}</span>
-                                            </div>
-                                            <div style={{height:'4px', background:'rgba(0,0,0,0.05)', borderRadius:'2px', marginTop:'8px', overflow:'hidden'}}>
-                                                <div style={{height:'100%', width: tasks.filter(t => t.projectId === p.id).length > 0 ? `${(tasks.filter(t => t.projectId === p.id && t.isDone).length / tasks.filter(t => t.projectId === p.id).length) * 100}%` : '0%', background:'var(--coral)', borderRadius:'2px'}}></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         <div className="section-header"><h2>Todas as Tarefas</h2></div>
                         <div className="task-list">
@@ -2766,15 +2733,6 @@ export default function Home() {
             </div>
             <div className="modal-row">
                 <div className="modal-field">
-                    <div className="modal-label">Projeto</div>
-                    <select className="modal-select modal-input" value={presetProjectId || ''} onChange={e => setPresetProjectId(e.target.value || null)}>
-                        <option value="">Sem projeto</option>
-                        {projects.map((p: any) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="modal-field">
                     <div className="modal-label">Rotina</div>
                     <select className="modal-select modal-input" value={newTaskRoutine} onChange={e => setNewTaskRoutine(e.target.value)}>
                         <option value="">Nenhuma</option>
@@ -2783,20 +2741,41 @@ export default function Home() {
                         ))}
                     </select>
                 </div>
+                <div className="modal-field">
+                    <div className="modal-label">Prioridade</div>
+                    <div className="modal-priority-row">
+                        <button className={`priority-btn high ${newTaskPriority === 'high' ? 'active' : ''}`} onClick={() => setNewTaskPriority('high')} aria-label="Alta prioridade">
+                            <Icons.AlertCircle size={13} strokeWidth={2} style={{display:'inline',marginBottom:'-2px',marginRight:'4px'}} />Alta
+                        </button>
+                        <button className={`priority-btn medium ${newTaskPriority === 'medium' ? 'active' : ''}`} onClick={() => setNewTaskPriority('medium')} aria-label="Média prioridade">
+                            <Icons.Minus size={13} strokeWidth={2} style={{display:'inline',marginBottom:'-2px',marginRight:'4px'}} />Média
+                        </button>
+                        <button className={`priority-btn low ${newTaskPriority === 'low' ? 'active' : ''}`} onClick={() => setNewTaskPriority('low')} aria-label="Baixa prioridade">
+                            <Icons.ChevronDown size={13} strokeWidth={2} style={{display:'inline',marginBottom:'-2px',marginRight:'4px'}} />Baixa
+                        </button>
+                    </div>
+                </div>
             </div>
             <div className="modal-field">
-                <div className="modal-label">Prioridade</div>
-                <div className="modal-priority-row">
-                    <button className={`priority-btn high ${newTaskPriority === 'high' ? 'active' : ''}`} onClick={() => setNewTaskPriority('high')} aria-label="Alta prioridade">
-                        <Icons.AlertCircle size={13} strokeWidth={2} style={{display:'inline',marginBottom:'-2px',marginRight:'4px'}} />Alta
-                    </button>
-                    <button className={`priority-btn medium ${newTaskPriority === 'medium' ? 'active' : ''}`} onClick={() => setNewTaskPriority('medium')} aria-label="Média prioridade">
-                        <Icons.Minus size={13} strokeWidth={2} style={{display:'inline',marginBottom:'-2px',marginRight:'4px'}} />Média
-                    </button>
-                    <button className={`priority-btn low ${newTaskPriority === 'low' ? 'active' : ''}`} onClick={() => setNewTaskPriority('low')} aria-label="Baixa prioridade">
-                        <Icons.ChevronDown size={13} strokeWidth={2} style={{display:'inline',marginBottom:'-2px',marginRight:'4px'}} />Baixa
-                    </button>
+                <div className="modal-label">Descrição <span style={{color:'var(--ink-faint)',fontWeight:400}}>(opcional)</span></div>
+                <textarea className="modal-input" placeholder="Adicione detalhes sobre esta tarefa..." value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} style={{resize:'vertical', minHeight:'72px', lineHeight:'1.5'}} />
+            </div>
+            <div className="modal-field">
+                <div className="modal-label">Tópicos Importantes <span style={{color:'var(--ink-faint)',fontWeight:400}}>(opcional)</span></div>
+                <div style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
+                    <input className="modal-input" style={{flex:1, margin:0}} placeholder="Ex: Revisar conteúdo do cap. 3..." value={newTopicInput} onChange={e => setNewTopicInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newTopicInput.trim()) { setNewTaskTopics(prev => [...prev, newTopicInput.trim()]); setNewTopicInput(''); e.preventDefault(); }}} />
+                    <button type="button" onClick={() => { if (newTopicInput.trim()) { setNewTaskTopics(prev => [...prev, newTopicInput.trim()]); setNewTopicInput(''); }}} style={{background:'var(--coral)', color:'white', border:'none', borderRadius:'10px', padding:'0 14px', cursor:'pointer', fontWeight:'600', fontSize:'18px', lineHeight:1, flexShrink:0}}>+</button>
                 </div>
+                {newTaskTopics.length > 0 && (
+                    <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>
+                        {newTaskTopics.map((topic, i) => (
+                            <span key={i} style={{display:'inline-flex', alignItems:'center', gap:'6px', background:'rgba(232,80,58,0.08)', border:'1px solid rgba(232,80,58,0.2)', borderRadius:'100px', padding:'4px 10px', fontSize:'12px', color:'var(--coral)', fontWeight:'500'}}>
+                                {topic}
+                                <button onClick={() => setNewTaskTopics(prev => prev.filter((_,j) => j !== i))} style={{background:'none', border:'none', cursor:'pointer', color:'var(--coral)', fontSize:'14px', lineHeight:1, padding:0, display:'flex', alignItems:'center'}}>×</button>
+                            </span>
+                        ))}
+                    </div>
+                )}
             </div>
             <div className="modal-actions">
                 <button className="modal-cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
@@ -2805,95 +2784,7 @@ export default function Home() {
         </div>
     </div>
 
-    
-    {/* ======== NEW PROJECT MODAL ======== */}
-    {isNewProjectOpen && (
-        <div className="modal-overlay open" onClick={() => setIsNewProjectOpen(false)}>
-            <div className="modal" onClick={e => e.stopPropagation()}>
-                <div className="modal-title">Novo Projeto</div>
-                <div className="modal-field">
-                    <div className="modal-label">Nome do projeto</div>
-                    <input className="modal-input" type="text" placeholder="Ex: Trabalho, Estudos..." value={newProjectName} onChange={e => setNewProjectName(e.target.value)} />
-                </div>
-                <div className="modal-field">
-                    <div className="modal-label">Cor</div>
-                    <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginTop:'4px'}}>
-                        {['#E8503A','#5B8BD4','#3D7A5E','#7A5AA8','#D4872A','#E87070','#56A47E'].map(c => (
-                            <div key={c} onClick={() => setNewProjectColor(c)} style={{width:'28px',height:'28px',borderRadius:'50%',background:c,cursor:'pointer',border: newProjectColor === c ? '3px solid var(--ink)' : '3px solid transparent',transition:'border 0.15s'}}></div>
-                        ))}
-                    </div>
-                </div>
-                <div className="modal-actions">
-                    <button className="modal-cancel" onClick={() => setIsNewProjectOpen(false)}>Cancelar</button>
-                    <button className="modal-save" onClick={async () => {
-                        if (!newProjectName.trim()) return;
-                        try {
-                            const proj = await createProject({ name: newProjectName.trim(), color: newProjectColor });
-                            setProjects(prev => [...prev, proj]);
-                            setNewProjectName('');
-                            setIsNewProjectOpen(false);
-                        } catch (err: any) {
-                            setSuccessToast('⚠️ ' + (err.message || 'Erro ao criar projeto.'));
-                            setTimeout(() => setSuccessToast(''), 4000);
-                        }
-                    }}>Criar projeto</button>
-                </div>
-            </div>
-        </div>
-    )}
 
-    {/* ======== NEW ROUTINE MODAL ======== */}
-    {/* ======== SHARE PROJECT MODAL ======== */}
-    {shareProjectId && (
-        <div className="modal-overlay open" onClick={() => setShareProjectId(null)}>
-            <div className="modal" onClick={e => e.stopPropagation()}>
-                <div className="modal-title">Compartilhar Projeto</div>
-                <div className="modal-field">
-                    <div className="modal-label">Convidar por E-mail</div>
-                    <div style={{display:'flex', gap:'8px'}}>
-                        <input className="modal-input" type="email" placeholder="Ex: colega@empresa.com" value={shareEmailInput} onChange={e => setShareEmailInput(e.target.value)} style={{flex:1}} />
-                        <button onClick={async () => {
-                            if (!shareEmailInput.trim()) return;
-                            if (currentUserData?.plan === 'FREE') {
-                                setSuccessToast('Acesso restrito. Compartilhamento avanado exige upgrade.');
-                                setTimeout(() => setSuccessToast(''), 4000);
-                                return;
-                            }
-                            try {
-                                const res = await inviteUserToProject(shareProjectId, shareEmailInput);
-                                if (res.success) {
-                                    setSuccessToast('Usurio adicionado com sucesso!');
-                                    setShareEmailInput('');
-                                    const p = await getProjects();
-                                    setProjects(p);
-                                }
-                            } catch (e: any) {
-                                setSuccessToast("Erro: ${e.message}");
-                                setTimeout(() => setSuccessToast(''), 4000);
-                            }
-                        }} style={{background:'var(--ink)', color:'white', border:'none', borderRadius:'8px', padding:'0 16px', fontWeight:'600', cursor:'pointer'}}>Enviar</button>
-                    </div>
-                </div>
-                <div className="modal-field" style={{marginTop:'24px'}}>
-                    <div className="modal-label">Membros Atuais</div>
-                    <div style={{display:'flex', flexDirection:'column', gap:'12px', marginTop:'12px'}}>
-                        {projects.find((p:any)=>p.id===shareProjectId)?.collaborators?.length > 0 ? projects.find((p:any)=>p.id===shareProjectId)?.collaborators?.map((c:any) => (
-                            <div key={c.id} style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                                {c.image ? <img src={c.image} alt={c.name} style={{width:'32px', height:'32px', borderRadius:'16px', objectFit:'cover'}} /> : <div style={{width:'32px', height:'32px', borderRadius:'16px', background:'var(--coral)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:'700'}}>{c.name?.charAt(0)?.toUpperCase() || '?'}</div>}
-                                <div style={{display:'flex', flexDirection:'column'}}>
-                                    <span style={{fontSize:'14px', fontWeight:'600', color:'var(--ink)'}}>{c.name || 'Usurio'}</span>
-                                    <span style={{fontSize:'12px', color:'var(--ink-light)'}}>{c.email}</span>
-                                </div>
-                            </div>
-                        )) : <div style={{fontSize:'14px', color:'var(--ink-light)'}}>Apenas voc tem acesso a este projeto.</div>}
-                    </div>
-                </div>
-                <div className="modal-actions" style={{marginTop:'32px'}}>
-                    <button className="modal-cancel" onClick={() => { setShareProjectId(null); setShareEmailInput(''); }} style={{width:'100%'}}>Fechar</button>
-                </div>
-            </div>
-        </div>
-    )}
     {isRoutineModalOpen && (
         <div className="modal-overlay open" onClick={() => setIsRoutineModalOpen(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>

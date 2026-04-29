@@ -51,8 +51,6 @@ model User {
   // App Specific
   tasks         Task[]
   routines      Routine[]
-  projects      Project[]
-  sharedProjects Project[] @relation("ProjectCollaborators")
   shoppingLists ShoppingList[]
 
   // Teams
@@ -75,17 +73,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model Project {
-  id          String   @id @default(cuid())
-  name        String
-  color       String
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collaborators User[] @relation("ProjectCollaborators")
-  tasks       Task[]
-  createdAt   DateTime @default(now())
-}
-
 model Routine {
   id          String   @id @default(cuid())
   name        String
@@ -99,6 +86,8 @@ model Routine {
 model Task {
   id           String   @id @default(cuid())
   title        String
+  description  String?  // Free-text description
+  topics       String[] @default([]) // Key points / bullet points
   isDone       Boolean  @default(false)
   priority     String   @default("low") // high, medium, low
   date         DateTime?
@@ -106,8 +95,6 @@ model Task {
   startTime    String?  // HH:MM format
   endTime      String?  // HH:MM format
   routineName  String?
-  projectId    String?
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   teamId       String?
   team         Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   assignedToId String?  // userId of the team member this task is assigned to
