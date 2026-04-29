@@ -161,6 +161,7 @@ export default function Home() {
 
   useEffect(() => {
     if (status === "authenticated") {
+      setActiveScreen("loading");
       getCurrentUserData().then(async (data) => {
         if (data?.status === 'SUSPENDED' || data?.status === 'BLOCKED') {
           setSuccessToast(`⚠️ Sua conta foi ${data.status === 'SUSPENDED' ? 'suspensa' : 'bloqueada'}. Entre em contato: easylist.oficial@gmail.com`);
@@ -450,6 +451,13 @@ export default function Home() {
             {overdue && <span style={{color:'var(--coral)', fontWeight:'600'}}>· ⚠️ Atrasada ({new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>}
             {expirationText}
           </div>
+          {t.topics && t.topics.length > 0 && (
+            <div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginTop:'6px'}}>
+              {t.topics.map((topic: string, i: number) => (
+                <span key={i} style={{fontSize:'10px', background:'rgba(232,80,58,0.08)', color:'var(--coral)', padding:'2px 6px', borderRadius:'100px', fontWeight:'600'}}>{topic}</span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="task-actions" style={{display:'flex', gap:'6px', alignItems:'center'}}>
             {overdue && (
@@ -529,7 +537,12 @@ export default function Home() {
         </div>
     </div>
 
-    
+    <div id="loading-screen" style={{ display: activeScreen === 'loading' ? 'flex' : 'none', position: 'fixed', inset: 0, background: 'var(--cream)', zIndex: 9999, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '20px' }}>
+        <div className="nav-logo" style={{ fontSize: '32px', animation: 'pulse 1.5s infinite ease-in-out' }}>easy<span>list</span></div>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--cream-dark)', borderTopColor: 'var(--coral)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
+    </div>
+
     <div id="landing" style={{ display: activeScreen === 'landing' ? 'block' : 'none' }}>
         <nav>
             <div className="nav-logo">easy<span>list</span></div>
@@ -1726,7 +1739,7 @@ export default function Home() {
                                         </div>
                                     </div>
                                     {/* Inner tabs */}
-                                    <div style={{display:'flex', borderBottom:'1px solid var(--cream-dark)', padding:'0 20px'}}>
+                                    <div className="team-tabs" style={{display:'flex', borderBottom:'1px solid var(--cream-dark)', padding:'0 20px'}}>
                                         {(['chat','tasks','members','stats'] as const).map(tab => {
                                             const labels: any = {chat:'Chat', tasks:'Tarefas', members:'Membros', stats:'Estatísticas'};
                                             return <button key={tab} onClick={() => setTeamActiveTab(tab)} style={{padding:'12px 16px', border:'none', background:'transparent', borderBottom: teamActiveTab===tab?'2px solid var(--coral)':'2px solid transparent', color: teamActiveTab===tab?'var(--coral)':'var(--ink-mid)', fontWeight: teamActiveTab===tab?'700':'500', fontSize:'13px', cursor:'pointer', transition:'all 0.2s'}}>{labels[tab]}</button>
@@ -2162,7 +2175,7 @@ export default function Home() {
 
                         {/* Subscription Management */}
                         <div style={{background:'var(--cream)', borderRadius:'20px', padding:'24px', marginBottom:'16px'}}>
-                            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px'}}>
+                            <div className="settings-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px'}}>
                                 <div style={{fontSize:'14px',fontWeight:'600',color:'var(--ink)',display:'flex',alignItems:'center',gap:'8px'}}>
                                     <Icons.CreditCard size={16} /> Assinatura Atual
                                 </div>
@@ -2212,9 +2225,10 @@ export default function Home() {
                         <div className="section-header">
                             <h2>Painel de Administração</h2>
                         </div>
-                        <div style={{background:'var(--white)', border:'1px solid var(--cream-dark)', borderRadius:'20px', overflow:'hidden'}}>
-                            <table style={{width:'100%', borderCollapse:'collapse', fontSize:'14px'}}>
-                                <thead style={{background:'var(--cream)', color:'var(--ink-light)', textAlign:'left', fontSize:'13px', borderBottom:'1px solid var(--cream-dark)'}}>
+                        <div className="admin-table-wrapper">
+                            <div style={{background:'var(--white)', border:'1px solid var(--cream-dark)', borderRadius:'20px', overflow:'hidden', minWidth:'800px'}}>
+                                <table style={{width:'100%', borderCollapse:'collapse', fontSize:'14px'}}>
+                                    <thead style={{background:'var(--cream)', color:'var(--ink-light)', textAlign:'left', fontSize:'13px', borderBottom:'1px solid var(--cream-dark)'}}>
                                     <tr>
                                         <th style={{padding:'16px'}}>Usuário</th>
                                         <th style={{padding:'16px'}}>Contato</th>
@@ -2268,6 +2282,7 @@ export default function Home() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
                 )}
@@ -2660,16 +2675,7 @@ export default function Home() {
         <div className="modal">
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px'}}>
                 <div className="modal-title" style={{marginBottom:0}}>{presetImportant ? 'Nova Tarefa Importante' : 'Nova Tarefa'}</div>
-                <button onClick={() => {
-                    setNewTaskTitle("Revisar estratégia de Q" + Math.ceil((new Date().getMonth() + 1) / 3));
-                    setNewTaskDate(new Date().toISOString().split('T')[0]);
-                    setNewTaskStartTime("14:00");
-                    setNewTaskEndTime("15:30");
-                    setNewTaskPriority("high");
-                    setAuthError('');
-                }} style={{background:'linear-gradient(135deg, var(--coral), var(--purple))', color:'white', border:'none', padding:'6px 12px', borderRadius:'10px', fontSize:'12px', fontWeight:'600', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px'}}>
-                    IA Sugerir
-                </button>
+
             </div>
             <div className="modal-field">
                 <div className="modal-label">Título</div>
