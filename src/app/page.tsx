@@ -125,7 +125,7 @@ export default function Home() {
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilterStatus, setTaskFilterStatus] = useState("all");
   const [taskFilterPriority, setTaskFilterPriority] = useState("all");
-  const [taskFilterProject, setTaskFilterProject] = useState("all");
+
   const [taskFilterDate, setTaskFilterDate] = useState("all");
   const [taskSortBy, setTaskSortBy] = useState("date");
   const [taskViewMode, setTaskViewMode] = useState<'list'|'cards'>('list');
@@ -445,7 +445,7 @@ export default function Home() {
             <span>{t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Média' : 'Baixa'}</span>
             {t.startTime && <span>• {t.startTime} - {t.endTime}</span>}
             {t.routineName && <span>· <Icons.Clock size={12} style={{display:'inline',marginBottom:'-2px'}}/> {t.routineName}</span>}
-            {t.projectId && <span>· <Icons.Folder size={12} style={{display:'inline',marginBottom:'-2px'}}/> {projects.find((p:any)=>p.id===t.projectId)?.name || 'Projeto'}</span>}
+
             {locked && <span style={{color:'var(--ink-light)'}}>• Futuro</span>}
             {overdue && <span style={{color:'var(--coral)', fontWeight:'600'}}>· ⚠️ Atrasada ({new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>}
             {expirationText}
@@ -1359,9 +1359,7 @@ export default function Home() {
                     {activeTab === 'Concluídas' && (
                         <></>
                     )}
-                    {activeTab.startsWith('proj-') && (
-                        <button className="app-add-btn" onClick={() => openTaskModal({ projectId: activeTab.replace('proj-','') })}><Icons.Plus size={16} style={{display:'inline',marginBottom:'-3px'}}/> Nova tarefa</button>
-                    )}
+
                 </div>
 
                 {/* ---- MEU DIA ---- */}
@@ -1494,7 +1492,7 @@ export default function Home() {
                             <a style={{cursor:'pointer'}} onClick={() => openTaskModal()}>+ Adicionar Rápido</a>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))',gap:'16px'}}>
-                            {tasks.filter(t => !t.isDone && !t.projectId).map(t => {
+                            {tasks.filter(t => !t.isDone).map(t => {
                                 const isOverdue = !t.routineName && !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] < new Date().toISOString().split('T')[0];
                                 return (
                                 <div key={t.id} style={{background: 'var(--white)', padding: '20px', borderRadius: '16px', border: '1px solid var(--cream-dark)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden'}}>
@@ -1521,7 +1519,7 @@ export default function Home() {
                                 </div>
                             )})}
                         </div>
-                        {tasks.filter(t => !t.isDone && !t.projectId).length === 0 && (
+                        {tasks.filter(t => !t.isDone).length === 0 && (
                             <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)',background:'var(--cream)',borderRadius:'16px'}}>
                                 <Icons.Inbox size={48} strokeWidth={1.5} style={{margin:'0 auto 16px',display:'block',color:'var(--ink-faint)'}} />
                                 Caixa de entrada vazia. Sem pendências soltas!
@@ -1530,43 +1528,7 @@ export default function Home() {
                     </>
                 )}
 
-                {/* ---- PROJETOS ---- */}
-                {activeTab.startsWith('proj-') && (
-                    <>
-                        <div className="section-header">
-                            <h2>Projeto: {projects.find((p:any) => p.id === activeTab.replace('proj-',''))?.name || 'Vazio'}</h2>
-                            <div style={{display:'flex', gap:'16px', alignItems:'center'}}>
-                                {(() => {
-                                    const proj = projects.find((p:any) => p.id === activeTab.replace('proj-',''));
-                                    const collabs = proj?.collaborators || [];
-                                    if(collabs.length === 0) return null;
-                                    return (
-                                        <div style={{display:'flex', marginRight:'8px'}}>
-                                            {collabs.map((c:any) => (
-                                                <div key={c.id} title={c.email} style={{width:'32px',height:'32px',borderRadius:'16px',background:'var(--coral)',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',marginLeft:'-10px',border:'2px solid var(--cream)',fontWeight:'700'}}>{c.name?.charAt(0)?.toUpperCase() || '?'}</div>
-                                            ))}
-                                        </div>
-                                    )
-                                })()}
-                                <button onClick={async () => {
-                                    if (currentUserData?.plan === 'FREE') {
-                                        setSuccessToast('Plano FREE não possui compartilhamento avançado. Faça upgrade!');
-                                        return;
-                                    }
-                                    setShareProjectId(activeTab.replace('proj-',''));
-                                }} style={{background:'white', color:'var(--ink)', border:'1.5px solid var(--cream-dark)', borderRadius:'10px', padding:'6px 14px', fontSize:'13px', cursor:'pointer', fontWeight:'600'}}>+ Compartilhar</button>
-                            </div>
-                        </div>
-                        <div className="task-list">
-                            {tasks.filter(t => !t.isDone && t.projectId === activeTab.replace('proj-','')).map(renderTaskItem)}
-                            {tasks.filter(t => !t.isDone && t.projectId === activeTab.replace('proj-','')).length === 0 && (
-                                <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)'}}>
-                                    Nenhuma pendência neste projeto.
-                                </div>
-                            )}
-                        </div>
-                    </>
-                )}
+
 
                 {/* ---- ROTINAS ---- */}
                 {activeTab === 'Rotinas' && (
@@ -1960,7 +1922,7 @@ export default function Home() {
                                             <h4 style={{fontSize:'15px', fontWeight:'700', color:'var(--ink)', margin:'0 0 16px 0', display:'flex', alignItems:'center', gap:'8px'}}><Icons.Users size={16} color="var(--coral)"/> {team.name}</h4>
                                             <div style={{display:'grid', gap:'12px'}}>
                                                 {team.members.map((m:any) => {
-                                                    const memberTasks = tasks.filter(t => t.userId === m.userId && (t.projectId || t.teamId === team.id));
+                                                    const memberTasks = tasks.filter(t => t.userId === m.userId && t.teamId === team.id);
                                                     const doneMember = memberTasks.filter(t => t.isDone).length;
                                                     const pctMember = memberTasks.length > 0 ? Math.round((doneMember / memberTasks.length) * 100) : 0;
                                                     return (
@@ -2463,8 +2425,7 @@ export default function Home() {
                                 const matchSearch = !taskSearch || tk.title.toLowerCase().includes(taskSearch.toLowerCase());
                                 const matchStatus = taskFilterStatus === 'all' || (taskFilterStatus === 'done' ? tk.isDone : !tk.isDone);
                                 const matchPriority = taskFilterPriority === 'all' || tk.priority === taskFilterPriority;
-                                const matchProject = taskFilterProject === 'all' || (taskFilterProject === 'none' ? !tk.projectId : tk.projectId === taskFilterProject);
-                                return matchSearch && matchStatus && matchPriority && matchProject;
+                                return matchSearch && matchStatus && matchPriority;
                             });
                             if (filtered.length === 0) return (
                                 <div style={{textAlign:'center',padding:'60px 20px',color:'var(--ink-faint)'}}>
