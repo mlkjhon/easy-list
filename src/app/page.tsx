@@ -627,7 +627,7 @@ export default function Home() {
                 só.</div>
 
             <div className="features-grid">
-                <div className="feature-card featured reveal-up">
+                <div className="feature-card featured">
                     <div>
                         <div className="feature-icon" style={{"background":"rgba(232,80,58,0.15)"}}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8503A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="11" width="18" height="10" rx="2"></rect>
@@ -670,7 +670,7 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="feature-card reveal-up">
+                <div className="feature-card">
                     <div className="feature-icon" style={{"background":"#FEF3DE"}}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4872A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -680,7 +680,7 @@ export default function Home() {
                         matinal e lembretes de rotina.</div>
                 </div>
 
-                <div className="feature-card reveal-up">
+                <div className="feature-card">
                     <div className="feature-icon" style={{"background":"#DFF0E8"}}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3D7A5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="20" x2="18" y2="10"></line>
                             <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -691,7 +691,7 @@ export default function Home() {
                         seu desempenho.</div>
                 </div>
 
-                <div className="feature-card reveal-up">
+                <div className="feature-card">
                     <div className="feature-icon" style={{"background":"#E8E4F0"}}>
                         <Icons.FolderOpen size={24} strokeWidth={1.5} color="#7A5AA8" />
                     </div>
@@ -700,7 +700,7 @@ export default function Home() {
                         com equipes.</div>
                 </div>
 
-                <div className="feature-card reveal-up">
+                <div className="feature-card">
                     <div className="feature-icon" style={{"background":"#FEE2DD"}}>
                         <Icons.RefreshCcw size={24} strokeWidth={1.5} color="#E8503A" />
                     </div>
@@ -709,7 +709,7 @@ export default function Home() {
                         repete, não esquece.</div>
                 </div>
 
-                <div className="feature-card reveal-up">
+                <div className="feature-card">
                     <div className="feature-icon" style={{"background":"#E4EEF8"}}>
                         <Icons.Globe size={24} strokeWidth={1.5} color="#3A6EA8" />
                     </div>
@@ -725,24 +725,24 @@ export default function Home() {
             <div className="section-label">Como funciona</div>
             <div className="section-title">Em 4 passos,<br/>sua vida organizada.</div>
             <div className="steps-grid">
-                <div className="step reveal-up">
+                <div className="step">
                     <div className="step-num">01<span>→</span></div>
                     <div className="step-title">Crie sua conta</div>
                     <div className="step-desc">Login social com Google. Leva menos de 30 segundos.</div>
                 </div>
-                <div className="step reveal-up">
+                <div className="step">
                     <div className="step-num">02<span>→</span></div>
                     <div className="step-title">Monte suas rotinas</div>
                     <div className="step-desc">Arraste blocos de tempo e dê nomes para seus momentos de foco. O app aprende
                         seu ritmo.</div>
                 </div>
-                <div className="step reveal-up">
+                <div className="step">
                     <div className="step-num">03<span>→</span></div>
                     <div className="step-title">Adicione tarefas</div>
                     <div className="step-desc">Qualquer tarefa, de qualquer jeito. Com prioridade, data, projeto, tempo
                         estimado.</div>
                 </div>
-                <div className="step reveal-up">
+                <div className="step">
                     <div className="step-num">04<span>✓</span></div>
                     <div className="step-title">Execute com foco</div>
                     <div className="step-desc">O app organiza tudo automaticamente no seu dia. Você só confirma e executa.
