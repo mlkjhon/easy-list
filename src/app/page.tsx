@@ -46,13 +46,7 @@ export default function Home() {
   const [presetImportant, setPresetImportant] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string|null>(null);
   
-  // AI Chat State
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<{role:'user'|'ai', content:string}[]>([
-    { role: 'ai', content: 'Olá! Sou seu assistente de produtividade. Estou aqui para te ajudar a organizar suas tarefas e manter o foco no que realmente importa. Como posso te ajudar hoje?' }
-  ]);
-  const [isAiTyping, setIsAiTyping] = useState(false);
+
 
   // UI Globals
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -323,33 +317,7 @@ export default function Home() {
   const refreshStats = () =>
     getStats().then(s => { setStreak(s.streak); setWeeklyRate(s.weeklyRate); });
 
-  const handleSendAiMessage = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!chatInput.trim()) return;
-    
-    const userMsg = chatInput.trim();
-    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    setChatInput("");
-    setIsAiTyping(true);
 
-    setTimeout(() => {
-      setIsAiTyping(false);
-      const pendingTasks = tasks.filter(t => !t.isDone);
-      const highPriority = pendingTasks.filter(t => t.priority === 'high');
-      let aiResponse = `Você tem ${pendingTasks.length} tarefa${pendingTasks.length !== 1 ? 's' : ''} pendente${pendingTasks.length !== 1 ? 's' : ''}${highPriority.length > 0 ? `, sendo ${highPriority.length} de alta prioridade` : ''}. Que tal começarmos pelo que é mais urgente?`;
-      if (userMsg.toLowerCase().includes("hoje")) {
-        const todayTasks = tasks.filter(t => !t.isDone && t.date && new Date(t.date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0]);
-        aiResponse = todayTasks.length > 0
-          ? `Para hoje, você tem ${todayTasks.length} tarefa${todayTasks.length > 1 ? 's' : ''} programada${todayTasks.length > 1 ? 's' : ''}. Minha sugestão é começar pelas de alta prioridade e ir avançando. Você consegue!`
-          : `Parece que sua agenda de hoje está livre de tarefas com data definida. É uma ótima oportunidade para avançar nas pendentes sem prazo.`;
-      } else if (userMsg.toLowerCase().includes("prioridade") || userMsg.toLowerCase().includes("importante")) {
-        aiResponse = highPriority.length > 0
-          ? `Você tem ${highPriority.length} tarefa${highPriority.length > 1 ? 's' : ''} de alta prioridade: ${highPriority.slice(0, 3).map(t => `"${t.title}"`).join(', ')}${highPriority.length > 3 ? ` e mais ${highPriority.length - 3}` : ''}. Essas merecem atenção imediata.`
-          : `Ótima notícia! Você não tem nenhuma tarefa de alta prioridade pendente. Continue assim!`;
-      }
-      setChatMessages(prev => [...prev, { role: 'ai', content: aiResponse }]);
-    }, 1200);
-  };
 
   const handleSaveTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -526,7 +494,7 @@ export default function Home() {
     <div className="smart-notif" id="smart-notif">
         <div className="sn-header">
             <span className="sn-icon">☀️</span>
-            <span className="sn-title">Lembrete Inteligente</span>
+            <span className="sn-title">Lembrete</span>
             <span className="sn-close">×</span>
         </div>
         <div className="sn-body">Seu bloco <strong>"Manhã Produtiva"</strong> começa em 15 min — 3 tarefas prontas pra você!
@@ -564,11 +532,10 @@ export default function Home() {
             <div className="hero-content">
                 <div className="hero-badge">
                     <div className="hero-badge-dot"></div>
-                    Rotinas Automáticas + Lembretes Inteligentes
+                    Organização simples e eficiente
                 </div>
-                <h1>Sua agenda que <em>pensa</em> por você.</h1>
-                <p>O easy list aprende seus padrões, organiza sua agenda sozinho e notifica na hora certa — você só
-                    confirma e executa.</p>
+                <h1>Sua agenda para <em>fazer</em> mais.</h1>
+                <p>O easy list organiza suas tarefas, rotinas e lembretes em um só lugar — simples, rápido e sem complicação.</p>
                 <div className="hero-actions">
                     <button className="btn-primary" onClick={() => setActiveScreen('onboarding')}>
                         Começar grátis
@@ -671,7 +638,7 @@ export default function Home() {
                             </svg></div>
                         <div className="feature-title">Rotinas Automáticas</div>
                         <div className="feature-desc">Defina blocos de tempo e deixe o app organizar suas tarefas dentro
-                            deles. O easy list aprende suas prioridades e preenche sua agenda — você só confirma.</div>
+                            deles. O easy list organiza por prioridade e preenche sua agenda automaticamente — você só confirma.</div>
                     </div>
                     <div className="routine-demo" style={{"flexShrink":"0"}}>
                         <div className="routine-timeline">
@@ -860,7 +827,7 @@ export default function Home() {
                         <li>Relatórios de produtividade</li>
                         <li>Compartilhar projetos (até 3)</li>
                         <li>Suporte prioritário</li>
-                        <li>🤖 IA Assistente (em breve)</li>
+                        <li>Compartilhar projetos (até 3)</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Assinar Pro</button>
                 </div>
@@ -873,7 +840,7 @@ export default function Home() {
                         <li>🏢 Até 5 usuários inclusos</li>
                         <li>🏢 Projetos compartilhados em equipe</li>
                         <li>🏢 Dashboard executivo</li>
-                        <li>🤖 IA Assistente (acesso antecipado)</li>
+                        <li>📊 Relatórios avançados</li>
                         <li>📞 Suporte dedicado</li>
                     </ul>
                     <button className="pricing-btn" onClick={() => setActiveScreen('onboarding')}>Começar com o time</button>
@@ -892,7 +859,7 @@ export default function Home() {
         <footer>
             <div>
                 <div className="footer-logo">easy<span>list</span></div>
-                <div className="footer-tagline">A agenda inteligente para<br/>freelancers, estudantes e empreendedores.</div>
+                <div className="footer-tagline">Organize seu dia com<br/>facilidade e eficiência.</div>
             </div>
             <div>
                 <div className="footer-col-title">Produto</div>
@@ -939,10 +906,10 @@ export default function Home() {
                 <div className="ob-screen active" id="ob-1" style={{ display: obStep === 1 ? 'flex' : 'none' }}>
                     <div className="ob-step">Passo 1 de 5</div>
                     <div className="ob-title">Bem-vindo(a) ao easy list. 👋</div>
-                    <div className="ob-sub">Sua agenda inteligente que organiza o dia por você.</div>
+                    <div className="ob-sub">Organize seu dia, suas tarefas e rotinas em um só lugar.</div>
                     <ul className="ob-checklist">
                         <li>
-                            <div className="ob-check-icon"><Icons.Bot size={20} strokeWidth={1.5} /></div> <span><strong>Rotinas Automáticas</strong> — blocos de
+                            <div className="ob-check-icon"><Icons.CheckCircle size={20} strokeWidth={1.5} /></div> <span><strong>Rotinas Automáticas</strong> — blocos de
                                 tempo que se preenchem sozinhos</span>
                         </li>
                         <li>
@@ -2804,50 +2771,7 @@ export default function Home() {
         </div>
     )}
 
-    {/* ======== AI ASSISTANT FAB & PANEL ======== */}
-    {['Meu Dia', 'Caixa de Entrada', 'Esta Semana', 'Lista de Compras', 'Rotinas'].includes(activeTab) && (
-        <button className="ai-fab" onClick={() => {
-            if (currentUserData?.plan !== 'PREMIUM') {
-                setSuccessToast('Acesso restrito. O Assistente IA é exclusivo do Plano Premium.');
-                setTimeout(() => setSuccessToast(''), 4000);
-                return;
-            }
-            setIsAiChatOpen(true);
-        }} title="Assistente IA">
-            <Icons.Sparkles size={24} />
-        </button>
-    )}
 
-    <div className={`ai-panel-overlay ${isAiChatOpen ? 'open' : ''}`} onClick={() => setIsAiChatOpen(false)}>
-        <div className="ai-panel" onClick={e => e.stopPropagation()}>
-            <div className="ai-header">
-                <div className="ai-title"><Icons.Sparkles size={20} color="var(--coral)" /> IA Assistente</div>
-                <button onClick={() => setIsAiChatOpen(false)} style={{background:'transparent', border:'none', color:'var(--ink-light)', cursor:'pointer', padding:'4px', borderRadius:'8px'}}><Icons.X size={20} /></button>
-            </div>
-            <div className="ai-chat-area">
-                {chatMessages.map((msg, i) => (
-                    <div key={i} className={`ai-bubble ${msg.role}`}>
-                        {msg.content}
-                    </div>
-                ))}
-                {isAiTyping && (
-                    <div className="ai-bubble ai">
-                        <div className="typing-indicator">
-                            <div className="typing-dot"></div><div className="typing-dot"></div><div className="typing-dot"></div>
-                        </div>
-                    </div>
-                )}
-            </div>
-            <form className="ai-input-area" onSubmit={handleSendAiMessage}>
-                <div className="ai-input-wrapper">
-                    <input type="text" className="ai-input" placeholder="Pergunte sobre suas tarefas..." value={chatInput} onChange={e => setChatInput(e.target.value)} />
-                    <button type="submit" className="ai-send-btn" disabled={!chatInput.trim() || isAiTyping}>
-                        <Icons.Send size={14} style={{marginLeft:'2px'}} />
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
     {/* ======== CREATE TEAM MODAL ======== */}
     {isCreateTeamModalOpen && (
         <div className="modal-overlay open" onClick={() => setIsCreateTeamModalOpen(false)}>
